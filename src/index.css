@@ -1,0 +1,190 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+    --bg-primary: #080B12;
+    --bg-secondary: #111827;
+    --bg-card: #161D2B;
+    --accent-cyan: #00E5FF;
+    --accent-violet: #8B5CF6;
+    --text-primary: #F5F7FA;
+    --text-muted: #94A3B8;
+    --border-cyan: rgba(0, 229, 255, 0.18);
+    --glow-cyan: rgba(0, 229, 255, 0.25);
+  }
+
+  html {
+    font-family: var(--font-sans);
+    scroll-behavior: smooth;
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: #080B12;
+    color: #F5F7FA;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+}
+
+.font-mono-nums {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.accent-studio {
+  accent-color: #00E5FF;
+}
+
+.glass-card {
+  background: rgba(17, 24, 39, 0.65);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(0, 229, 255, 0.15);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  border-radius: 20px;
+}
+
+.glass-card-interactive {
+  background: rgba(17, 24, 39, 0.65);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(0, 229, 255, 0.15);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  border-radius: 20px;
+  transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
+}
+
+.glass-card-interactive:hover {
+  border-color: rgba(0, 229, 255, 0.42);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45), 0 0 24px rgba(0, 229, 255, 0.14);
+}
+
+.futuristic-grid-bg {
+  background-image:
+    linear-gradient(to right, rgba(0, 229, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 229, 255, 0.05) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.cyan-divider-glow {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 229, 255, 0.45), rgba(139, 92, 246, 0.45), transparent);
+}
+
+/* Harmonize embedded secondary studios (Xerox, Converters, Resume Maker) into the Dark Futuristic Glass shell */
+.studio-dark-shell {
+  color: #F5F7FA;
+}
+
+.studio-dark-shell .bg-white:not(.preserve-paper) {
+  background-color: rgba(22, 29, 43, 0.82);
+  border-color: rgba(0, 229, 255, 0.16);
+}
+
+.studio-dark-shell .bg-slate-50,
+.studio-dark-shell .bg-slate-50\/70,
+.studio-dark-shell .bg-slate-100,
+.studio-dark-shell .bg-slate-200\/80 {
+  background-color: rgba(17, 24, 39, 0.78);
+}
+
+.studio-dark-shell .border-slate-200,
+.studio-dark-shell .border-slate-100,
+.studio-dark-shell .border-slate-300 {
+  border-color: rgba(0, 229, 255, 0.16);
+}
+
+.studio-dark-shell .text-slate-900 {
+  color: #F5F7FA;
+}
+
+.studio-dark-shell .text-slate-800,
+.studio-dark-shell .text-slate-700 {
+  color: #E2E8F0;
+}
+
+.studio-dark-shell .text-slate-600,
+.studio-dark-shell .text-slate-500 {
+  color: #94A3B8;
+}
+
+.studio-dark-shell input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+.studio-dark-shell select,
+.studio-dark-shell textarea {
+  background-color: #0B101B;
+  color: #F5F7FA;
+  border-color: rgba(0, 229, 255, 0.22);
+}
+
+.studio-dark-shell input::placeholder,
+.studio-dark-shell textarea::placeholder {
+  color: #64748B;
+}
+
+.studio-dark-shell .bg-white:not(.preserve-paper) button.bg-slate-900,
+.studio-dark-shell button.bg-slate-900 {
+  background: linear-gradient(135deg, #00E5FF, #0EA5E9);
+  color: #080B12;
+  font-weight: 700;
+}
+
+.studio-dark-shell button.bg-slate-900:hover {
+  filter: brightness(1.08);
+}
+
+.studio-dark-shell .bg-amber-600 {
+  background: linear-gradient(135deg, #00E5FF, #8B5CF6);
+  color: #080B12;
+  font-weight: 700;
+}
+
+.studio-dark-shell .bg-amber-600:hover {
+  filter: brightness(1.08);
+}
+
+.studio-dark-shell .text-amber-700,
+.studio-dark-shell .text-amber-800 {
+  color: #00E5FF;
+}
+
+.studio-dark-shell .bg-emerald-50 {
+  background-color: rgba(6, 78, 59, 0.35);
+}
+
+.studio-dark-shell .border-emerald-200 {
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+.studio-dark-shell .text-emerald-800 {
+  color: #6EE7B7;
+}
+
+.studio-dark-shell .bg-red-50 {
+  background-color: rgba(127, 29, 29, 0.35);
+}
+
+.studio-dark-shell .border-red-200 {
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.studio-dark-shell .text-red-700,
+.studio-dark-shell .text-red-600 {
+  color: #FCA5A5;
+}
+
+.studio-dark-shell .bg-amber-50\/30,
+.studio-dark-shell .bg-amber-50\/60 {
+  background-color: rgba(0, 229, 255, 0.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

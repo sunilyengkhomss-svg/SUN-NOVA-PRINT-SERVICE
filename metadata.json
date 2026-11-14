@@ -1,0 +1,6 @@
+{
+  "name": "SUN-NOVA PRINT SERVICE",
+  "description": "300 PPI passport size photo maker and print sheet studio with uniform photo spacing across 4x6, 5x7, 6x8, A4, and A5 paper.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
