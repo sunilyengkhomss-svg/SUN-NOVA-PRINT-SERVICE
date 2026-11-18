@@ -92,26 +92,44 @@ async function main() {
     throw new Error(msg);
   }
 
-  const listUrl = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(
-    accountId
-  )}/builds/workers/${encodeURIComponent(workerName)}/triggers`;
+  const candidatePaths = [
+    `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(
+      accountId
+    )}/workers/scripts/${encodeURIComponent(workerName)}/builds/triggers`,
+    `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(
+      accountId
+    )}/builds/workers/${encodeURIComponent(workerName)}/triggers`,
+  ];
 
-  const res = await cfRequest(token, listUrl, "GET");
+  let res = null;
+  let matchedBase = "";
+  for (const url of candidatePaths) {
+    const attempt = await cfRequest(token, url, "GET");
+    res = attempt;
+    if (attempt.ok) {
+      matchedBase = url;
+      break;
+    }
+    if (attempt.status !== 404) {
+      break;
+    }
+  }
 
-  if (!res.ok) {
-    if (res.status === 401 || res.status === 403 || res.status === 404) {
+  if (!res || !res.ok) {
+    const status = res?.status ?? 0;
+    if (status === 401 || status === 403 || status === 404) {
       console.log(
-        `[cf-builds] Workers Builds API unavailable for this token/worker (HTTP ${res.status}). If Cloudflare still runs failing 'dist' builds, click Disconnect at: ${dashboardPath}`
+        `[cf-builds] Workers Builds API unavailable for this token/worker (HTTP ${status}). To stop failing 'dist' builds on Cloudflare, click Disconnect at: ${dashboardPath}`
       );
       appendGithubEnv({
-        LEGACY_CF_BUILDS_STATUS: `manual-check-required (HTTP ${res.status})`,
+        LEGACY_CF_BUILDS_STATUS: `manual-disconnect-needed (HTTP ${status})`,
       });
       return;
     }
-    const errMsg = `Cloudflare API returned HTTP ${res.status} while checking Workers Builds triggers.`;
+    const errMsg = `Cloudflare API returned HTTP ${status} while checking Workers Builds triggers.`;
     if (warnOnly) {
       console.warn(`[cf-builds] Warning: ${errMsg}`);
-      appendGithubEnv({ LEGACY_CF_BUILDS_STATUS: "manual-check-required" });
+      appendGithubEnv({ LEGACY_CF_BUILDS_STATUS: "manual-disconnect-needed" });
       return;
     }
     throw new Error(errMsg);
@@ -140,16 +158,28 @@ async function main() {
   for (const trigger of triggers) {
     const triggerId = trigger?.trigger_uuid || trigger?.id;
     if (!triggerId) continue;
-    const delUrl = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(
-      accountId
-    )}/builds/triggers/${encodeURIComponent(triggerId)}`;
-    const delRes = await cfRequest(token, delUrl, "DELETE");
-    if (delRes.ok) {
+    const delUrls = [
+      `${matchedBase}/${encodeURIComponent(triggerId)}`,
+      `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(
+        accountId
+      )}/builds/triggers/${encodeURIComponent(triggerId)}`,
+    ];
+    let deleted = false;
+    let lastStatus = 0;
+    for (const delUrl of delUrls) {
+      const delRes = await cfRequest(token, delUrl, "DELETE");
+      lastStatus = delRes.status;
+      if (delRes.ok) {
+        deleted = true;
+        break;
+      }
+    }
+    if (deleted) {
       removed += 1;
       console.log(`[cf-builds] Disconnected legacy Workers Builds trigger ${triggerId}.`);
     } else {
       console.warn(
-        `[cf-builds] Could not delete trigger ${triggerId} via API (HTTP ${delRes.status}). Disconnect manually at: ${dashboardPath}`
+        `[cf-builds] Could not delete trigger ${triggerId} via API (HTTP ${lastStatus}). Disconnect manually at: ${dashboardPath}`
       );
     }
   }
