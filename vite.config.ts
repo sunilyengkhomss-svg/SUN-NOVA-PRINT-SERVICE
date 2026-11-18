@@ -16,17 +16,26 @@ function normalizeBaseUrl(raw?: string): string {
   return withLead.endsWith("/") ? withLead : `${withLead}/`;
 }
 
-function excludeOrtWasmPlugin() {
+function pruneOrtWasmPlugin() {
   return {
-    name: "exclude-ort-wasm",
+    name: "prune-ort-wasm",
     generateBundle(_options: unknown, bundle: Record<string, { type: string; source?: Uint8Array | string }>) {
-      if (process.env.EXCLUDE_ORT_WASM !== "true") return;
+      if (process.env.BUNDLE_ORT_WASM === "true") {
+        console.log("[vite-build] BUNDLE_ORT_WASM=true: keeping local ONNX WASM assets bundled in dist.");
+        return;
+      }
+      let removedCount = 0;
       for (const fileName of Object.keys(bundle)) {
         if (/^ort-wasm.*\.wasm$/i.test(fileName) || /^ort(\.webgpu)?\.bundle\.min\.mjs$/i.test(fileName)) {
           delete bundle[fileName];
+          removedCount += 1;
         }
       }
-      console.log("[vite-build] EXCLUDE_ORT_WASM=true: stripped bundled ONNX WASM assets (CDN fallback active).");
+      if (removedCount > 0) {
+        console.log(
+          `[vite-build] Pruned ${removedCount} local ONNX WASM asset(s) for lightweight CDN deploy (set BUNDLE_ORT_WASM=true to bundle locally).`
+        );
+      }
     },
   };
 }
@@ -34,7 +43,7 @@ function excludeOrtWasmPlugin() {
 export default defineConfig(() => {
   return {
     base: normalizeBaseUrl(process.env.VITE_BASE_URL),
-    plugins: [react(), tailwindcss(), excludeOrtWasmPlugin()],
+    plugins: [react(), tailwindcss(), pruneOrtWasmPlugin()],
     resolve: {
       alias: {
         '@': path.resolve(rootDir, '.'),

@@ -151,7 +151,7 @@ export async function validateWranglerProject({
         .map((f) => `${f.rel} (${(f.size / (1024 * 1024)).toFixed(2)} MiB)`)
         .join(", ");
       throw new Error(
-        `Static asset(s) exceed Cloudflare Workers 25 MiB per-file cap: ${details}. Set EXCLUDE_ORT_WASM=true when building to use CDN fallback.`
+        `Static asset(s) exceed Cloudflare Workers 25 MiB per-file cap: ${details}. Unset BUNDLE_ORT_WASM to exclude large ONNX WASM chunks and use CDN fallback.`
       );
     }
 

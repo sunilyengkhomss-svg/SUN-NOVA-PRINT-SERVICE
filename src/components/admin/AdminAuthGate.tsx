@@ -231,9 +231,9 @@ export function AdminAuthGate({
               </div>
 
               <p className="text-[11px] text-[#94A3B8] leading-relaxed">
-                With <code className="text-[#E2E8F0]">npx wrangler deploy</code> (set as Deploy command, not <code className="text-[#E2E8F0]">dist</code>), add{" "}
-                <code className="text-[#00E5FF]">D1_DATABASE_ID</code> in Build Variables or run{" "}
-                <code className="text-[#E2E8F0]">npm run cf:setup</code> so deployments keep <code className="text-[#E2E8F0]">DB</code> &amp; <code className="text-[#E2E8F0]">MEDIA_BUCKET</code> bound.
+                In Cloudflare Dashboard (<span className="text-[#E2E8F0]">Settings → Build → Edit</span>), set Deploy command to{" "}
+                <code className="text-[#00E5FF]">npx wrangler deploy</code> (never <code className="text-amber-300">dist</code>), and either enable the GitHub Actions workflow or set{" "}
+                <code className="text-[#00E5FF]">D1_DATABASE_ID</code> in Build Variables so <code className="text-[#E2E8F0]">DB</code> &amp; <code className="text-[#E2E8F0]">MEDIA_BUCKET</code> stay bound.
               </p>
 
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-[#94A3B8]">
@@ -261,6 +261,18 @@ export function AdminAuthGate({
               </div>
 
               <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => copyText("deploy", "npx wrangler deploy")}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#161D2B] border border-white/15 text-[11px] font-mono-nums text-[#E2E8F0] hover:border-[#00E5FF]/50 cursor-pointer"
+                >
+                  {copiedKey === "deploy" ? (
+                    <Check className="w-3 h-3 text-emerald-400" />
+                  ) : (
+                    <Copy className="w-3 h-3 text-[#00E5FF]" />
+                  )}
+                  <span>{copiedKey === "deploy" ? "Copied" : "Copy npx wrangler deploy"}</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => copyText("cmd", "npm run cf:setup")}

@@ -379,19 +379,19 @@ export function AdminOverviewTab({
               <ul className="list-disc pl-4 space-y-1.5 text-[11px] text-[#94A3B8]">
                 <li>
                   <span className="text-[#E2E8F0] font-semibold">
-                    Cloudflare Workers Deploy Command:
+                    Fix Cloudflare Dashboard Deploy Command (Step-by-Step):
                   </span>{" "}
-                  In Cloudflare Builds settings, set <code className="text-[#E2E8F0]">Build command</code> to{" "}
-                  <code className="text-[#00E5FF]">npm run build</code> and <code className="text-[#E2E8F0]">Deploy command</code> to{" "}
-                  <code className="text-[#00E5FF]">npx wrangler deploy</code> (or <code className="text-[#00E5FF]">npm run cf:deploy</code>) — never <code className="text-[#E2E8F0]">dist</code>.
+                  Open <span className="text-[#E2E8F0]">Workers &amp; Pages → sun-nova-print-service → Settings → Build → Edit</span>, keep{" "}
+                  <code className="text-[#00E5FF]">npm run build</code> as Build command, change{" "}
+                  <span className="text-[#E2E8F0]">Deploy command</span> from <code className="text-amber-300">dist</code> to{" "}
+                  <code className="text-[#00E5FF]">npx wrangler deploy</code>, click <span className="text-[#E2E8F0]">Save</span>, and trigger <span className="text-[#E2E8F0]">Retry deployment</span>.
                 </li>
                 <li>
                   <span className="text-[#E2E8F0] font-semibold">
-                    D1 &amp; R2 Bindings (Build Variables vs. CLI):
+                    Auto-Bind D1 &amp; R2 (GitHub Actions or Build Variables):
                   </span>{" "}
-                  Set <code className="text-[#00E5FF]">D1_DATABASE_ID</code> (and optional <code className="text-[#00E5FF]">R2_BUCKET_NAME</code>) in{" "}
-                  <span className="text-[#E2E8F0]">Build variables</span>, or run{" "}
-                  <code className="text-[#00E5FF]">npm run cf:setup</code> once to lock them into <code className="text-[#E2E8F0]">wrangler.jsonc</code>. Note that runtime secrets like <code className="text-[#E2E8F0]">RESEND_API_KEY</code> and <code className="text-[#E2E8F0]">ADMIN_SETUP_TOKEN</code> belong under{" "}
+                  Add <code className="text-[#00E5FF]">CLOUDFLARE_API_TOKEN</code> + <code className="text-[#00E5FF]">CLOUDFLARE_ACCOUNT_ID</code> to GitHub Repository Secrets for automated D1/R2 creation &amp; migrations, OR set{" "}
+                  <code className="text-[#00E5FF]">D1_DATABASE_ID</code> in Cloudflare Build Variables (or run <code className="text-[#00E5FF]">npm run cf:setup</code>). Move <code className="text-[#E2E8F0]">RESEND_API_KEY</code> &amp; <code className="text-[#E2E8F0]">ADMIN_SETUP_TOKEN</code> to{" "}
                   <span className="text-[#E2E8F0]">Workers → Settings → Variables and Secrets</span>.
                 </li>
               </ul>

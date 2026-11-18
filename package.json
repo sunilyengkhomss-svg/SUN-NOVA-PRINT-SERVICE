@@ -11,6 +11,7 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "cf:setup": "node scripts/setup-cloudflare-worker.mjs",
+    "cf:ci-resolve": "node scripts/resolve-ci-bindings.mjs",
     "cf:validate": "node scripts/validate-wrangler.mjs",
     "cf:sync-secrets": "node scripts/sync-worker-secrets.mjs",
     "cf:deploy": "node scripts/deploy-worker.mjs",
