@@ -8,7 +8,10 @@
 /index.html
   Cache-Control: no-cache, no-store, must-revalidate
 
-/assets/script-*.js
+/assets/app-*.js
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/chunk-*.js
   Cache-Control: public, max-age=31536000, immutable
 
 /assets/style-*.css

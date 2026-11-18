@@ -57,9 +57,8 @@ export default defineConfig(() => {
       assetsInlineLimit: 32 * 1024,
       rolldownOptions: {
         output: {
-          codeSplitting: false,
-          entryFileNames: 'assets/script-[hash].js',
-          chunkFileNames: 'assets/script-[hash].js',
+          entryFileNames: 'assets/app-[hash].js',
+          chunkFileNames: 'assets/chunk-[name]-[hash].js',
           assetFileNames: (assetInfo) => {
             if (
               assetInfo.names?.some((name) => name.endsWith('.css')) ||

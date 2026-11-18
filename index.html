@@ -74,13 +74,27 @@
             }
             if (window.__SUN_NOVA_MOUNTED__) return;
             if (e && e.target && e.target.tagName === "SCRIPT") {
-              var failedSrc = e.target.src || "script.js";
+              var failedSrc = e.target.src || "app.js";
               if (failedSrc.indexOf("/src/main.tsx") !== -1) {
                 bootErr = "Unbuilt source deployed (" + failedSrc + "). In Cloudflare Pages, set Build command to 'npm run build' and Build output directory to 'dist' (or upload the built dist/ folder instead of the root repo folder).";
+                showBootError(bootErr);
               } else {
-                bootErr = "Failed to load application script (" + failedSrc + "). Deploy built ./dist assets via 'npx wrangler deploy' (not 'Deploy command: dist') and hard-refresh.";
+                bootErr = "Failed to load application script (" + failedSrc + "). Checking response...";
+                showBootError(bootErr);
+                if (typeof window.fetch === "function") {
+                  window.fetch(failedSrc, { cache: "no-store" })
+                    .then(function (r) {
+                      var ct = (r.headers && r.headers.get("content-type")) || "unknown";
+                      var extra = ct.indexOf("text/html") !== -1
+                        ? " — server returned HTML fallback (asset missing from deployed ./dist/assets/)."
+                        : " — check Cloudflare Deploy command ('npx wrangler deploy') or network/extension.";
+                      showBootError("Failed to load application script (" + failedSrc + "): HTTP " + r.status + " (" + ct + ")" + extra);
+                    })
+                    .catch(function (fe) {
+                      showBootError("Failed to load application script (" + failedSrc + "): " + (fe && fe.message ? fe.message : "Network blocked or aborted."));
+                    });
+                }
               }
-              showBootError(bootErr);
             } else if (e && e.message) {
               bootErr = "Startup error: " + e.message;
               showBootError(bootErr);
