@@ -1,14 +1,20 @@
 import React, { useState } from "react";
 import {
+  AlertTriangle,
   ArrowLeft,
+  Check,
+  Copy,
+  Database,
   Eye,
   EyeOff,
+  HardDrive,
   KeyRound,
   Lock,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import { AdminUser } from "../../types/cms";
+import { AdminUser, StorageStatusInfo } from "../../types/cms";
 import { BRAND_NAME, OFFICIAL_SUPPORT_EMAIL } from "../../types/photo";
 import {
   loginAdmin,
@@ -20,6 +26,8 @@ import {
 interface AdminAuthGateProps {
   needsSetup: boolean;
   setupTokenRequired: boolean;
+  storageStatus?: StorageStatusInfo;
+  onRefreshStatus?: () => void;
   onAuthenticated: (admin: AdminUser) => void;
   onExitAdmin: () => void;
 }
@@ -29,9 +37,17 @@ type AuthScreenMode = "login" | "forgot" | "reset";
 export function AdminAuthGate({
   needsSetup,
   setupTokenRequired,
+  storageStatus,
+  onRefreshStatus,
   onAuthenticated,
   onExitAdmin,
 }: AdminAuthGateProps) {
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const copyText = (key: string, text: string) => {
+    navigator.clipboard?.writeText(text).catch(() => undefined);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 1600);
+  };
   const [mode, setMode] = useState<AuthScreenMode>("login");
   const [name, setName] = useState("SUN-NOVA Administrator");
   const [email, setEmail] = useState(OFFICIAL_SUPPORT_EMAIL);
@@ -165,6 +181,89 @@ export function AdminAuthGate({
                 : "Enter your recovery code (or server ADMIN_SETUP_TOKEN) and choose a new password."}
             </p>
           </div>
+
+          {storageStatus && (!storageStatus.d1Bound || !storageStatus.r2Bound) && (
+            <div className="rounded-xl bg-[#080B12]/80 border border-amber-400/35 p-3.5 space-y-2.5 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-amber-200 font-semibold">
+                  <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0" />
+                  <span>Cloudflare Bindings Required for Persistence</span>
+                </div>
+                {onRefreshStatus && (
+                  <button
+                    type="button"
+                    onClick={onRefreshStatus}
+                    className="inline-flex items-center gap-1 text-[11px] font-mono-nums text-[#00E5FF] hover:underline cursor-pointer shrink-0"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>Recheck</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-[#111827] border border-white/10">
+                  <span className="inline-flex items-center gap-1.5 text-[#CBD5E1]">
+                    <Database className="w-3.5 h-3.5 text-[#00E5FF]" />
+                    <span className="font-mono-nums">DB</span>
+                  </span>
+                  <span
+                    className={`font-mono-nums font-semibold ${
+                      storageStatus.d1Bound ? "text-emerald-400" : "text-amber-300"
+                    }`}
+                  >
+                    {storageStatus.d1Bound ? "Bound" : "Fallback"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-[#111827] border border-white/10">
+                  <span className="inline-flex items-center gap-1.5 text-[#CBD5E1]">
+                    <HardDrive className="w-3.5 h-3.5 text-[#8B5CF6]" />
+                    <span className="font-mono-nums">MEDIA_BUCKET</span>
+                  </span>
+                  <span
+                    className={`font-mono-nums font-semibold ${
+                      storageStatus.r2Bound ? "text-emerald-400" : "text-amber-300"
+                    }`}
+                  >
+                    {storageStatus.r2Bound ? "Bound" : "Fallback"}
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-[#94A3B8] leading-relaxed">
+                With <code className="text-[#E2E8F0]">npx wrangler deploy</code>, add{" "}
+                <code className="text-[#00E5FF]">D1_DATABASE_ID</code> in Cloudflare Workers Build Variables or run{" "}
+                <code className="text-[#E2E8F0]">npm run cf:setup</code> so deployments keep <code className="text-[#E2E8F0]">DB</code> &amp; <code className="text-[#E2E8F0]">MEDIA_BUCKET</code> bound.
+              </p>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => copyText("cmd", "npm run cf:setup")}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#161D2B] border border-white/15 text-[11px] font-mono-nums text-[#E2E8F0] hover:border-[#00E5FF]/50 cursor-pointer"
+                >
+                  {copiedKey === "cmd" ? (
+                    <Check className="w-3 h-3 text-emerald-400" />
+                  ) : (
+                    <Copy className="w-3 h-3 text-[#00E5FF]" />
+                  )}
+                  <span>{copiedKey === "cmd" ? "Copied" : "Copy npm run cf:setup"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => copyText("var", "D1_DATABASE_ID")}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#161D2B] border border-white/15 text-[11px] font-mono-nums text-[#E2E8F0] hover:border-[#00E5FF]/50 cursor-pointer"
+                >
+                  {copiedKey === "var" ? (
+                    <Check className="w-3 h-3 text-emerald-400" />
+                  ) : (
+                    <Copy className="w-3 h-3 text-[#00E5FF]" />
+                  )}
+                  <span>{copiedKey === "var" ? "Copied" : "Copy D1_DATABASE_ID"}</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {error && (
             <div

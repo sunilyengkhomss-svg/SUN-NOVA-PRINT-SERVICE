@@ -1,8 +1,11 @@
+import { useState } from "react";
 import {
   Activity,
   AlertTriangle,
   Briefcase,
+  Check,
   CheckCircle2,
+  Copy,
   Database,
   FileText,
   FolderOpen,
@@ -41,6 +44,12 @@ export function AdminOverviewTab({
   loading,
   onNavigate,
 }: AdminOverviewTabProps) {
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const copyValue = (id: string, text: string) => {
+    navigator.clipboard?.writeText(text).catch(() => undefined);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 1600);
+  };
   const counts = overview?.counts ?? {
     totalImages: 0,
     totalFiles: 0,
@@ -312,23 +321,64 @@ export function AdminOverviewTab({
           </div>
 
           {(!storageStatus.d1Bound || !storageStatus.r2Bound) && (
-            <div className="mt-3 pt-3 border-t border-white/10 text-xs text-[#CBD5E1] space-y-1.5">
+            <div className="mt-3 pt-3 border-t border-white/10 text-xs text-[#CBD5E1] space-y-2">
               <p className="font-semibold text-amber-200">
                 {storageStatus.summary}
               </p>
-              <ul className="list-disc pl-4 space-y-1 text-[11px] text-[#94A3B8]">
+              <ul className="list-disc pl-4 space-y-1.5 text-[11px] text-[#94A3B8]">
                 <li>
-                  <span className="text-[#E2E8F0] font-semibold">Cloudflare Pages (Functions):</span>{" "}
-                  Open <span className="text-[#E2E8F0]">Settings → Functions → Bindings</span> and attach D1 variable{" "}
-                  <code className="text-[#00E5FF]">DB</code> (<code className="text-[#E2E8F0]">sun-nova-db</code>) and R2 variable{" "}
-                  <code className="text-[#00E5FF]">MEDIA_BUCKET</code> (<code className="text-[#E2E8F0]">sun-nova-media</code>), then redeploy.
+                  <span className="text-[#E2E8F0] font-semibold">
+                    Cloudflare Workers (<code className="text-[#00E5FF]">npx wrangler deploy</code> — Build Variables):
+                  </span>{" "}
+                  Wrangler overwrites Dashboard-only bindings on each push unless declared in <code className="text-[#E2E8F0]">wrangler.jsonc</code>. Set{" "}
+                  <code className="text-[#00E5FF]">D1_DATABASE_ID</code> (and optional <code className="text-[#00E5FF]">R2_BUCKET_NAME</code>) in{" "}
+                  <span className="text-[#E2E8F0]">Workers &amp; Pages → sun-nova-print-service → Settings → Build variables</span> so <code className="text-[#E2E8F0]">npm run build</code> injects them automatically before deploy.
                 </li>
                 <li>
-                  <span className="text-[#E2E8F0] font-semibold">Cloudflare Workers (npx wrangler deploy):</span>{" "}
-                  Attach <code className="text-[#00E5FF]">DB</code> &amp; <code className="text-[#00E5FF]">MEDIA_BUCKET</code> in{" "}
-                  <span className="text-[#E2E8F0]">Workers &amp; Pages → sun-nova-print-service → Settings → Bindings</span> or uncomment them with your D1 ID in <code className="text-[#E2E8F0]">wrangler.jsonc</code>.
+                  <span className="text-[#E2E8F0] font-semibold">
+                    One-Command CLI Setup (Recommended):
+                  </span>{" "}
+                  Run <code className="text-[#00E5FF]">npm run cf:setup</code> locally once to create <code className="text-[#E2E8F0]">sun-nova-db</code> &amp; <code className="text-[#E2E8F0]">sun-nova-media</code>, run migrations, and lock their IDs into <code className="text-[#E2E8F0]">wrangler.jsonc</code>.
                 </li>
               </ul>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => copyValue("cf-setup", "npm run cf:setup")}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#080B12] border border-white/15 text-[11px] font-mono-nums text-[#E2E8F0] hover:border-[#00E5FF]/50 cursor-pointer"
+                >
+                  {copiedId === "cf-setup" ? (
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5 text-[#00E5FF]" />
+                  )}
+                  <span>{copiedId === "cf-setup" ? "Copied" : "Copy: npm run cf:setup"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => copyValue("d1-var", "D1_DATABASE_ID")}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#080B12] border border-white/15 text-[11px] font-mono-nums text-[#E2E8F0] hover:border-[#00E5FF]/50 cursor-pointer"
+                >
+                  {copiedId === "d1-var" ? (
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5 text-[#00E5FF]" />
+                  )}
+                  <span>{copiedId === "d1-var" ? "Copied" : "Copy: D1_DATABASE_ID"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => copyValue("r2-var", "R2_BUCKET_NAME")}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#080B12] border border-white/15 text-[11px] font-mono-nums text-[#E2E8F0] hover:border-[#00E5FF]/50 cursor-pointer"
+                >
+                  {copiedId === "r2-var" ? (
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5 text-[#00E5FF]" />
+                  )}
+                  <span>{copiedId === "r2-var" ? "Copied" : "Copy: R2_BUCKET_NAME"}</span>
+                </button>
+              </div>
             </div>
           )}
         </div>

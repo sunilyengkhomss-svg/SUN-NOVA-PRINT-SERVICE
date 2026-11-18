@@ -28,6 +28,7 @@ import {
   QuoteRequestRecord,
   SamplePortraitRecord,
   ServiceRecord,
+  StorageStatusInfo,
   WebsiteSettings,
 } from "../../types/cms";
 import { BRAND_NAME } from "../../types/photo";
@@ -84,6 +85,7 @@ export function AdminPortal({
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [setupTokenRequired, setSetupTokenRequired] = useState(false);
+  const [storageStatus, setStorageStatus] = useState<StorageStatusInfo | undefined>(undefined);
   const [admin, setAdmin] = useState<AdminUser | null>(null);
 
   const [activeTab, setActiveTab] = useState<AdminSectionKey>("overview");
@@ -110,6 +112,7 @@ export function AdminPortal({
       const boot = await fetchBootstrapStatus();
       setNeedsSetup(boot.needsSetup);
       setSetupTokenRequired(boot.setupTokenRequired);
+      setStorageStatus(boot.storageStatus);
       setAdmin(boot.admin ?? null);
     } catch {
       setAdmin(null);
@@ -201,6 +204,8 @@ export function AdminPortal({
       <AdminAuthGate
         needsSetup={needsSetup}
         setupTokenRequired={setupTokenRequired}
+        storageStatus={storageStatus}
+        onRefreshStatus={checkAuth}
         onAuthenticated={(loggedIn) => {
           setNeedsSetup(false);
           setAdmin(loggedIn);

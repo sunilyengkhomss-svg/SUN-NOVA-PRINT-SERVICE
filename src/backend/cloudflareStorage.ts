@@ -179,8 +179,26 @@ const initializedDbs = new WeakSet<D1Database>();
 
 export async function ensureSchemaTables(db: D1Database): Promise<void> {
   if (initializedDbs.has(db)) return;
-  for (const sql of SCHEMA_STATEMENTS) {
-    await db.prepare(sql).run();
+  try {
+    // Fast probe: if core tables + media_blobs already exist and are populated, skip DDL batch
+    const [settingsRow] = await Promise.all([
+      db.prepare("SELECT setting_key FROM website_settings LIMIT 1").first(),
+      db.prepare("SELECT r2_key FROM media_blobs LIMIT 1").first(),
+    ]);
+    if (settingsRow) {
+      initializedDbs.add(db);
+      return;
+    }
+  } catch {
+    // One or more tables are missing; proceed to batch creation
+  }
+
+  try {
+    await db.batch(SCHEMA_STATEMENTS.map((sql) => db.prepare(sql)));
+  } catch {
+    for (const sql of SCHEMA_STATEMENTS) {
+      await db.prepare(sql).run();
+    }
   }
   initializedDbs.add(db);
 }

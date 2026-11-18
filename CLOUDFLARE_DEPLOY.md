@@ -1,71 +1,59 @@
-# SUN-NOVA PRINT SERVICE — Backend & Cloudflare Deployment Guide
+# SUN-NOVA PRINT SERVICE — Backend & Cloudflare Workers Deployment Guide
 
-This application uses **React + TypeScript + Vite** for the frontend and a **Cloudflare Pages Functions / Cloudflare Workers + Cloudflare D1 (SQLite) + Cloudflare R2** backend. In local development (`npm run dev`), `server.ts` runs local adapters (`node:sqlite` in `.local-backend/sunnova.db` and local disk R2 emulation in `.local-backend/r2/`).
+This application uses **React + TypeScript + Vite** for the frontend and a **Cloudflare Workers (`npx wrangler deploy`) + Cloudflare D1 (SQLite) + Cloudflare R2** backend. In local development (`npm run dev`), `server.ts` runs local adapters (`node:sqlite` in `.local-backend/sunnova.db` and local disk R2 emulation in `.local-backend/r2/`).
 
 - **Official Support Email:** `sopport.sunnovaprintservice@gmail.com`
 
 ---
 
-## Automatic Zero-503 Resilience (Even Before Bindings Are Added)
+## Why `npx wrangler deploy` Can Drop Dashboard Bindings (And How This Project Fixes It)
 
-If `DB` (D1) or `MEDIA_BUCKET` (R2) are not bound yet after a fresh Cloudflare deployment, the API router (`src/backend/apiRouter.ts` + `src/backend/cloudflareStorage.ts`) automatically keeps the website and `/admin` online without `503` errors:
+Cloudflare Workers Builds executes:
+- **Build command:** `npm run build`
+- **Deploy command:** `npx wrangler deploy`
 
-1. **`DB` + `MEDIA_BUCKET` bound (`mode: "d1+r2"`):** Full persistent production mode — auto-creates missing schema tables on cold start (`ensureSchemaTables`) and stores uploaded files in R2.
-2. **`DB` bound, `MEDIA_BUCKET` unbound (`mode: "d1+d1blob"`):** Stores metadata and uploaded assets (up to `1.5 MB` per file) directly in D1 `media_blobs` until you bind R2.
-3. **Neither bound (`mode: "memory-fallback"`):** Runs an isolate-scoped in-memory D1/R2 fallback so the homepage, studio tools, and `/admin` diagnostics dashboard work immediately, while displaying binding setup instructions in **Admin Overview → Cloudflare Bindings & Storage Status**. *(Note: memory fallback data resets on isolate cold restart — always bind D1 + R2 for permanent production persistence.)*
+Because Wrangler treats `wrangler.jsonc` as the **single source of truth**, any D1/R2 binding added only in the Cloudflare Dashboard UI is removed on the next Git push unless it is present in `wrangler.jsonc` at deploy time.
 
----
-
-## Option A (Recommended): Cloudflare Pages with Functions
-
-1. **Create Cloudflare Pages Project** connected to GitHub (`sunilyengkhomss-svg/SUN-NOVA-PRINT-SERVICE`):
-   - **Build command:** `npm run build`
-   - **Build output directory:** `dist`
-   - Functions in `functions/api/*` (`[[path]].ts`, `chat.ts`, `ocr.ts`, `resume-assist.ts`) deploy automatically alongside `dist/`.
-2. **Create D1 Database & R2 Bucket** (either in Cloudflare Dashboard or CLI):
-   ```bash
-   npx wrangler login
-   npx wrangler d1 create sun-nova-db
-   npx wrangler r2 bucket create sun-nova-media
-   npx wrangler d1 migrations apply sun-nova-db --remote
-   ```
-   *(Note: even if you skip manual migration, `ensureSchemaTables` auto-creates all tables on first request.)*
-3. **Attach Bindings in Cloudflare Pages Dashboard** (**Settings → Functions → Bindings**, for **Production** and **Preview**):
-   - **D1 Database Binding:** Variable name = `DB`, Database = `sun-nova-db`
-   - **R2 Bucket Binding:** Variable name = `MEDIA_BUCKET`, Bucket = `sun-nova-media`
-4. **Add Environment Variables / Secrets** (**Settings → Environment variables**):
-   - `GEMINI_API_KEY` *(optional — enables Ask AI Agent, OCR extractor, and Resume AI writer)*
-   - `ADMIN_SETUP_TOKEN` *(optional — protects first-time Super Admin registration at `/admin`)*
-   - `RESEND_API_KEY` & `EMAIL_FROM` *(optional — sends password reset & customer reply emails)*
-5. **Redeploy** once after saving bindings so Pages Functions pick up `DB` and `MEDIA_BUCKET`.
+This repository solves that in three ways:
+1. **`keep_vars: true` in `wrangler.jsonc`:** Prevents `npx wrangler deploy` from wiping Dashboard-configured environment variables (`GEMINI_API_KEY`, `VITE_SITE_URL`, `RESEND_API_KEY`, etc.).
+2. **Pre-build Binding Sync (`npm run build`):** Automatically injects `d1_databases` (`DB`) and `r2_buckets` (`MEDIA_BUCKET`) into `wrangler.jsonc` right before `npx wrangler deploy` whenever you set `D1_DATABASE_ID` (and optional `R2_BUCKET_NAME`) in **Cloudflare Build Variables**.
+3. **Zero-503 Storage Resilience:** Even before D1/R2 are attached, `/api/*` falls back cleanly (`d1+d1blob` or `memory-fallback`) and auto-creates all 14 tables atomically on first request (`ensureSchemaTables`).
 
 ---
 
-## Option B: Cloudflare Workers (`wrangler.jsonc`)
+## Option A (Recommended): Cloudflare Workers (`npx wrangler deploy`)
 
-Your `wrangler.jsonc` targets worker name `sun-nova-print-service` (`main: "src/worker.ts"`, static assets from `./dist` with SPA fallback).
+### Method 1 — One-Command CLI Setup (Permanent `wrangler.jsonc` Bindings)
+Run once from your machine:
+```bash
+npx wrangler login
+npm run cf:setup
+```
+This creates `sun-nova-db` (D1) and `sun-nova-media` (R2), applies `migrations/0001_init.sql` remotely, and writes real `"d1_databases"` and `"r2_buckets"` blocks into `wrangler.jsonc`. Commit and push `wrangler.jsonc`—every future Workers Build automatically keeps `DB` and `MEDIA_BUCKET` bound.
 
-1. **Deploy command** (matches Cloudflare Workers Builds):
-   ```bash
-   npm run build && npx wrangler deploy
-   ```
-   *(or `npm run deploy:worker`)*
-2. **Attach Bindings (`DB` & `MEDIA_BUCKET`):**
-   - Either attach them directly in **Cloudflare Dashboard → Workers & Pages → sun-nova-print-service → Settings → Bindings** (recommended when using Git auto-builds with `wrangler.jsonc` unchanged), **OR**
-   - Uncomment `"d1_databases"` and `"r2_buckets"` in `wrangler.jsonc` and paste your real `database_id` from `npx wrangler d1 create sun-nova-db`.
-3. **Set Secrets via Wrangler CLI:**
-   ```bash
-   npx wrangler secret put GEMINI_API_KEY
-   npx wrangler secret put ADMIN_SETUP_TOKEN
-   npx wrangler secret put RESEND_API_KEY
-   ```
+### Method 2 — Cloudflare Dashboard Build Variables (No Code Edits)
+1. Create your D1 database (`sun-nova-db`) and R2 bucket (`sun-nova-media`) in the Cloudflare Dashboard (or via `npx wrangler d1 create sun-nova-db` and `npx wrangler r2 bucket create sun-nova-media`).
+2. Copy your D1 **Database ID (UUID)**.
+3. In **Cloudflare Dashboard → Workers & Pages → `sun-nova-print-service` → Settings → Builds & Deployments → Build variables**, add:
+   - `D1_DATABASE_ID` = `<your-d1-database-uuid>`
+   - `R2_BUCKET_NAME` = `sun-nova-media` *(optional, defaults to `sun-nova-media`)*
+   - `D1_DATABASE_NAME` = `sun-nova-db` *(optional, defaults to `sun-nova-db`)*
+4. Trigger a redeploy. During `npm run build`, `scripts/sync-wrangler-bindings.mjs` injects `DB` and `MEDIA_BUCKET` into `wrangler.jsonc` right before `npx wrangler deploy` executes.
+
+### Runtime Secrets (Optional)
+Configure in **Workers & Pages → Settings → Variables and Secrets** (or `npx wrangler secret put`):
+- `GEMINI_API_KEY` — enables Ask AI Agent, OCR extractor, and Resume AI writer
+- `ADMIN_SETUP_TOKEN` — protects initial Super Admin registration at `/admin`
+- `RESEND_API_KEY` & `EMAIL_FROM` — sends password reset and customer reply emails
+- `VITE_SITE_URL` — optional canonical website URL (kept flexible across custom domains)
 
 ---
 
-## Storage Security Architecture
+## Option B: Cloudflare Pages with Functions
 
-- **Public Website Assets** (`public/...`): CMS banners, outfits, backgrounds, sample portraits, services, and portfolio images are streamed via `/api/media/public/<key>` with long-lived immutable cache headers and `X-Content-Type-Options: nosniff`.
-- **Private Files** (`private/...`): Customer quote attachments and private studio archives return `403 Forbidden` on public routes and can only be streamed via authenticated `/api/admin/media/:id/file`.
+1. **Build command:** `npm run build`
+2. **Build output directory:** `dist`
+3. Bind **D1 Database** (`DB` → `sun-nova-db`) and **R2 Bucket** (`MEDIA_BUCKET` → `sun-nova-media`) in **Pages → Settings → Functions → Bindings** (Production and Preview), then redeploy.
 
 ---
 
@@ -74,5 +62,5 @@ Your `wrangler.jsonc` targets worker name `sun-nova-print-service` (`main: "src/
 No hardcoded plaintext admin password exists in the codebase.
 
 1. Visit `/admin` on your deployed site.
-2. Check **Cloudflare Bindings & Storage Status** after login on Dashboard Overview to verify `DB` and `MEDIA_BUCKET` both show **Bound**.
+2. Confirm **D1 Database (`DB`)** and **R2 Bucket (`MEDIA_BUCKET`)** both show **Bound** in the status panel.
 3. Enter your **Full Name**, **Admin Email** (`sopport.sunnovaprintservice@gmail.com` or your chosen owner email), and a **Strong Password** (minimum 8 characters) to provision `super_admin`.
