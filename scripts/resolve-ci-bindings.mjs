@@ -128,6 +128,12 @@ function main() {
 try {
   main();
 } catch (err) {
-  console.error(`[cf-ci] ERROR: ${err instanceof Error ? err.message : String(err)}`);
+  const msg = err instanceof Error ? err.message : String(err);
+  console.error(`[cf-ci] ERROR: ${msg}`);
+  if (/auth|token|permission|401|403|unable to authenticate/i.test(msg)) {
+    console.error(
+      "[cf-ci] Hint: Ensure CLOUDFLARE_API_TOKEN includes Account permissions: Workers Scripts (Edit), D1 (Edit), Workers R2 Storage (Edit), Account Settings (Read)."
+    );
+  }
   process.exit(1);
 }

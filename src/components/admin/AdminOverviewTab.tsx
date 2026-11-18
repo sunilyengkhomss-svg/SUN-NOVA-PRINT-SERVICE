@@ -379,46 +379,47 @@ export function AdminOverviewTab({
               <ul className="list-disc pl-4 space-y-1.5 text-[11px] text-[#94A3B8]">
                 <li>
                   <span className="text-[#E2E8F0] font-semibold">
-                    Fix Cloudflare Dashboard Deploy Command (Step-by-Step):
+                    Recommended — Bypass Failing Dashboard Builds via GitHub Actions:
                   </span>{" "}
-                  Open <span className="text-[#E2E8F0]">Workers &amp; Pages → sun-nova-print-service → Settings → Build → Edit</span>, keep{" "}
-                  <code className="text-[#00E5FF]">npm run build</code> as Build command, change{" "}
-                  <span className="text-[#E2E8F0]">Deploy command</span> from <code className="text-amber-300">dist</code> to{" "}
-                  <code className="text-[#00E5FF]">npx wrangler deploy</code>, click <span className="text-[#E2E8F0]">Save</span>, and trigger <span className="text-[#E2E8F0]">Retry deployment</span>.
+                  In Cloudflare Dashboard (<span className="text-[#E2E8F0]">Settings → Builds</span>), click{" "}
+                  <span className="text-[#E2E8F0]">Disconnect</span> to stop <code className="text-amber-300">Deploy command: dist</code> errors. Then add{" "}
+                  <code className="text-[#00E5FF]">CLOUDFLARE_API_TOKEN</code> + <code className="text-[#00E5FF]">CLOUDFLARE_ACCOUNT_ID</code> (plus optional{" "}
+                  <code className="text-[#E2E8F0]">RESEND_API_KEY</code> &amp; <code className="text-[#E2E8F0]">ADMIN_SETUP_TOKEN</code>) in GitHub{" "}
+                  <span className="text-[#E2E8F0]">Settings → Secrets and variables → Actions</span> so pushes to <code className="text-[#E2E8F0]">main</code> auto-create D1/R2, apply migrations, and deploy.
                 </li>
                 <li>
                   <span className="text-[#E2E8F0] font-semibold">
-                    Auto-Bind D1 &amp; R2 (GitHub Actions or Build Variables):
+                    Alternative — Keep Cloudflare Dashboard Builds:
                   </span>{" "}
-                  Add <code className="text-[#00E5FF]">CLOUDFLARE_API_TOKEN</code> + <code className="text-[#00E5FF]">CLOUDFLARE_ACCOUNT_ID</code> to GitHub Repository Secrets for automated D1/R2 creation &amp; migrations, OR set{" "}
-                  <code className="text-[#00E5FF]">D1_DATABASE_ID</code> in Cloudflare Build Variables (or run <code className="text-[#00E5FF]">npm run cf:setup</code>). Move <code className="text-[#E2E8F0]">RESEND_API_KEY</code> &amp; <code className="text-[#E2E8F0]">ADMIN_SETUP_TOKEN</code> to{" "}
-                  <span className="text-[#E2E8F0]">Workers → Settings → Variables and Secrets</span>.
+                  Under <span className="text-[#E2E8F0]">Settings → Builds → Edit</span>, change <span className="text-[#E2E8F0]">Deploy command</span> to{" "}
+                  <code className="text-[#00E5FF]">npx wrangler deploy</code>, add <code className="text-[#00E5FF]">D1_DATABASE_ID</code> to Build Variables, and move runtime secrets to{" "}
+                  <span className="text-[#E2E8F0]">Variables and Secrets</span>.
                 </li>
               </ul>
               <div className="flex flex-wrap gap-2 pt-1">
                 <button
                   type="button"
-                  onClick={() => copyValue("cf-setup", "npm run cf:setup")}
+                  onClick={() => copyValue("cf-token", "CLOUDFLARE_API_TOKEN")}
                   className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#080B12] border border-white/15 text-[11px] font-mono-nums text-[#E2E8F0] hover:border-[#00E5FF]/50 cursor-pointer"
                 >
-                  {copiedId === "cf-setup" ? (
+                  {copiedId === "cf-token" ? (
                     <Check className="w-3.5 h-3.5 text-emerald-400" />
                   ) : (
                     <Copy className="w-3.5 h-3.5 text-[#00E5FF]" />
                   )}
-                  <span>{copiedId === "cf-setup" ? "Copied" : "Copy: npm run cf:setup"}</span>
+                  <span>{copiedId === "cf-token" ? "Copied" : "Copy: CLOUDFLARE_API_TOKEN"}</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => copyValue("d1-var", "D1_DATABASE_ID")}
+                  onClick={() => copyValue("cf-account", "CLOUDFLARE_ACCOUNT_ID")}
                   className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#080B12] border border-white/15 text-[11px] font-mono-nums text-[#E2E8F0] hover:border-[#00E5FF]/50 cursor-pointer"
                 >
-                  {copiedId === "d1-var" ? (
+                  {copiedId === "cf-account" ? (
                     <Check className="w-3.5 h-3.5 text-emerald-400" />
                   ) : (
                     <Copy className="w-3.5 h-3.5 text-[#00E5FF]" />
                   )}
-                  <span>{copiedId === "d1-var" ? "Copied" : "Copy: D1_DATABASE_ID"}</span>
+                  <span>{copiedId === "cf-account" ? "Copied" : "Copy: CLOUDFLARE_ACCOUNT_ID"}</span>
                 </button>
                 <button
                   type="button"

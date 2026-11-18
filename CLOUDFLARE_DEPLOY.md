@@ -6,58 +6,51 @@ This application uses **React + TypeScript + Vite** for the frontend and a **Clo
 
 ---
 
-## Step-by-Step: Fix Cloudflare Workers Dashboard `Deploy command` (`dist` → `npx wrangler deploy`)
+## Option 1 (Primary): Automated GitHub Actions Deploy (Bypasses Dashboard `dist` Error)
 
-If your Cloudflare Workers build passed `npm run build` and failed in ~2 seconds during **Deploying**, follow these exact steps:
+This repository includes `.github/workflows/deploy.yml`, which handles everything automatically on every push to `main`:
+- Typechecks (`npm run lint`) and builds a lightweight `~9.7 MB` SPA (pruning local ONNX WASM so background removal loads via CDN).
+- Automatically resolves or creates `sun-nova-db` (D1) and `sun-nova-media` (R2).
+- Applies remote D1 SQL migrations (`migrations/0001_init.sql`).
+- Pushes Worker runtime secrets securely via `wrangler secret bulk`.
+- Deploys cleanly via `npx wrangler deploy`.
 
-1. Open the **Cloudflare Dashboard** → **Compute (Workers & Pages)** → **Workers & Pages**.
-2. Click **`sun-nova-print-service`**.
-3. Open the **Settings** tab → **Build** (or **Builds & Deployments**).
-4. Click **Edit** next to **Build configuration**.
-5. Verify **Build command** is `npm run build` and **Root directory** is `/`.
-6. Change **Deploy command** from `dist` to:
-   ```bash
-   npx wrangler deploy
-   ```
-   *(Never enter `dist` here—Cloudflare Workers executes this field as a shell command and already reads `./dist` from `wrangler.jsonc`.)*
-7. Click **Save**, then open **Deployments** and click **Retry deployment** (or push a new commit to `main`).
-
----
-
-## Automated GitHub Actions Deploy (Recommended for Zero-Click D1 & R2 Sync)
-
-This repository includes `.github/workflows/deploy.yml`, which automatically resolves/creates `sun-nova-db` (D1) and `sun-nova-media` (R2), applies `migrations/0001_init.sql` remotely, validates the build, syncs runtime secrets, and deploys via `npx wrangler deploy` on every push to `main`.
-
-1. In your GitHub repository → **Settings → Secrets and variables → Actions → Secrets**, add:
-   - `CLOUDFLARE_API_TOKEN` *(Cloudflare API Token with Workers Scripts, D1, and R2 Edit permissions)*
-   - `CLOUDFLARE_ACCOUNT_ID` *(your Cloudflare Account ID)*
-   - Optional runtime secrets pushed securely into Worker Secrets: `ADMIN_SETUP_TOKEN`, `RESEND_API_KEY`, `GEMINI_API_KEY`
-2. Optional **Repository Variables** (`Settings → Secrets and variables → Actions → Variables`):
-   - `VITE_SITE_URL`, `VITE_BASE_URL`, `EMAIL_FROM`, `D1_DATABASE_NAME`, `R2_BUCKET_NAME`, `BUNDLE_ORT_WASM`
-
----
-
-## Build Variables vs. Worker Runtime Secrets
-
-Cloudflare **Build variables** are only available during `npm run build`—they are **not** passed into your live Worker's `env` at runtime.
-
-1. **Build Variables** *(Workers → Settings → Build → Build variables)*:
-   - `VITE_SITE_URL` — optional canonical website URL (kept flexible across custom domains)
-   - `VITE_BASE_URL` — optional base path (defaults to `/`)
-   - `D1_DATABASE_ID` — your Cloudflare D1 UUID (injected into `wrangler.jsonc` before `npx wrangler deploy`)
-   - `R2_BUCKET_NAME` — optional R2 bucket name (e.g. `sun-nova-media`)
-   - `BUNDLE_ORT_WASM` — optional (`true` bundles the 22.81 MiB ONNX WASM file locally; **default is excluded** so background removal loads cleanly from CDN for fast ~10 MB deploys)
-
-2. **Worker Runtime Secrets** *(Workers → Settings → Variables and Secrets, or `npm run cf:sync-secrets`)*:
-   - `ADMIN_SETUP_TOKEN` — protects initial Super Admin registration and recovery at `/admin`
-   - `RESEND_API_KEY` & `EMAIL_FROM` — sends password reset and customer reply emails
-   - `GEMINI_API_KEY` — enables Ask AI Agent, OCR extractor, and Resume AI writer
-
-> `wrangler.jsonc` sets `"keep_vars": true`, so `npx wrangler deploy` preserves all Dashboard-configured runtime variables and secrets.
+### One-Time Setup (4 Steps)
+1. **Disconnect Cloudflare's Failing Workers Build Trigger:**
+   - Open **Cloudflare Dashboard → Compute (Workers & Pages) → Workers & Pages → `sun-nova-print-service`**.
+   - Go to **Settings → Builds** and click **Disconnect** (under the connected Git repository). This stops Cloudflare from running the broken `Deploy command: dist` build on every commit.
+2. **Create a Cloudflare API Token:**
+   - Go to **My Profile → API Tokens → Create Token** (or **Create Custom Token**).
+   - Grant **Account** permissions:
+     - `Workers Scripts: Edit`
+     - `D1: Edit`
+     - `Workers R2 Storage: Edit`
+     - `Account Settings: Read`
+3. **Add GitHub Repository Secrets:**
+   - In GitHub → **`sunilyengkhomss-svg/SUN-NOVA-PRINT-SERVICE` → Settings → Secrets and variables → Actions → Repository secrets**, add:
+     - `CLOUDFLARE_API_TOKEN` *(required)*
+     - `CLOUDFLARE_ACCOUNT_ID` *(required — found on your Cloudflare Workers & Pages overview sidebar)*
+     - `ADMIN_SETUP_TOKEN` *(optional — protects initial `/admin` registration)*
+     - `RESEND_API_KEY` *(optional — sends Admin Mail Desk replies & password reset emails)*
+     - `GEMINI_API_KEY` *(optional — enables Ask AI Agent, OCR & Resume AI)*
+   - Optional **Repository variables** (**Actions → Variables** tab): `VITE_SITE_URL`, `VITE_BASE_URL`, `EMAIL_FROM`, `D1_DATABASE_NAME`, `R2_BUCKET_NAME`, `BUNDLE_ORT_WASM`.
+4. **Trigger Deploy:**
+   - Open the **Actions** tab in GitHub → **Deploy to Cloudflare Workers** → **Run workflow** (or push to `main`).
 
 ---
 
-## Validation, Secret Sync & CLI Commands
+## Option 2 (Alternative): Keep Cloudflare Workers Builds Enabled
+
+If you prefer Cloudflare's built-in Git trigger instead of disconnecting it:
+1. Open **Workers & Pages → `sun-nova-print-service` → Settings → Builds → Build configuration → Edit**.
+2. Keep **Build command** as `npm run build` and **Root directory** as `/`.
+3. Change **Deploy command** from `dist` to **`npx wrangler deploy`** and click **Save**.
+4. Move `RESEND_API_KEY` and `ADMIN_SETUP_TOKEN` from **Build variables** into **Settings → Variables and Secrets**.
+5. Optionally add `D1_DATABASE_ID` and `R2_BUCKET_NAME` under **Build variables**.
+
+---
+
+## CLI Validation & Management Scripts
 
 - **`npm run cf:setup`**: One-command local setup creating `sun-nova-db` (D1) & `sun-nova-media` (R2), running remote migrations, and writing bindings to `wrangler.jsonc`.
 - **`npm run cf:ci-resolve`**: Non-interactive CI helper to look up/create D1 & R2 and apply remote migrations.

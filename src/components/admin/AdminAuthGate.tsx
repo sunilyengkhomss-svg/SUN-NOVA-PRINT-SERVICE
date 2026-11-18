@@ -231,9 +231,8 @@ export function AdminAuthGate({
               </div>
 
               <p className="text-[11px] text-[#94A3B8] leading-relaxed">
-                In Cloudflare Dashboard (<span className="text-[#E2E8F0]">Settings → Build → Edit</span>), set Deploy command to{" "}
-                <code className="text-[#00E5FF]">npx wrangler deploy</code> (never <code className="text-amber-300">dist</code>), and either enable the GitHub Actions workflow or set{" "}
-                <code className="text-[#00E5FF]">D1_DATABASE_ID</code> in Build Variables so <code className="text-[#E2E8F0]">DB</code> &amp; <code className="text-[#E2E8F0]">MEDIA_BUCKET</code> stay bound.
+                Recommended: Disconnect Cloudflare <span className="text-[#E2E8F0]">Settings → Builds</span> (to stop <code className="text-amber-300">dist</code> deploy errors) and add{" "}
+                <code className="text-[#00E5FF]">CLOUDFLARE_API_TOKEN</code> + <code className="text-[#00E5FF]">CLOUDFLARE_ACCOUNT_ID</code> in GitHub Actions Secrets so <code className="text-[#E2E8F0]">DB</code> &amp; <code className="text-[#E2E8F0]">MEDIA_BUCKET</code> auto-bind.
               </p>
 
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-[#94A3B8]">
@@ -263,6 +262,18 @@ export function AdminAuthGate({
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
+                  onClick={() => copyText("token", "CLOUDFLARE_API_TOKEN")}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#161D2B] border border-white/15 text-[11px] font-mono-nums text-[#E2E8F0] hover:border-[#00E5FF]/50 cursor-pointer"
+                >
+                  {copiedKey === "token" ? (
+                    <Check className="w-3 h-3 text-emerald-400" />
+                  ) : (
+                    <Copy className="w-3 h-3 text-[#00E5FF]" />
+                  )}
+                  <span>{copiedKey === "token" ? "Copied" : "Copy CLOUDFLARE_API_TOKEN"}</span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => copyText("deploy", "npx wrangler deploy")}
                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#161D2B] border border-white/15 text-[11px] font-mono-nums text-[#E2E8F0] hover:border-[#00E5FF]/50 cursor-pointer"
                 >
@@ -284,18 +295,6 @@ export function AdminAuthGate({
                     <Copy className="w-3 h-3 text-[#00E5FF]" />
                   )}
                   <span>{copiedKey === "cmd" ? "Copied" : "Copy npm run cf:setup"}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => copyText("var", "D1_DATABASE_ID")}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#161D2B] border border-white/15 text-[11px] font-mono-nums text-[#E2E8F0] hover:border-[#00E5FF]/50 cursor-pointer"
-                >
-                  {copiedKey === "var" ? (
-                    <Check className="w-3 h-3 text-emerald-400" />
-                  ) : (
-                    <Copy className="w-3 h-3 text-[#00E5FF]" />
-                  )}
-                  <span>{copiedKey === "var" ? "Copied" : "Copy D1_DATABASE_ID"}</span>
                 </button>
               </div>
             </div>
