@@ -1,0 +1,27 @@
+{
+  "name": "SUN-NOVA PRINT SERVICE",
+  "short_name": "SUN-NOVA",
+  "description": "Premium futuristic digital printing studio, large-format artwork, branding design, 300 PPI passport photo maker, ID Xerox, PDF converters, and Resume Studio.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080B12",
+  "theme_color": "#080B12",
+  "icons": [
+    {
+      "src": "/favicon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/aistudio/Sun-Nova_Print_Service_Icon_0e46cdd8.png",
+      "sizes": "1254x1254",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

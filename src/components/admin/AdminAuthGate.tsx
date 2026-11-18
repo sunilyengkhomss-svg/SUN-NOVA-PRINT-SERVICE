@@ -15,7 +15,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { AdminUser, StorageStatusInfo } from "../../types/cms";
-import { BRAND_NAME, OFFICIAL_SUPPORT_EMAIL } from "../../types/photo";
+import { BRAND_ICON_URL, BRAND_NAME, OFFICIAL_SUPPORT_EMAIL } from "../../types/photo";
 import {
   loginAdmin,
   requestPasswordReset,
@@ -158,9 +158,16 @@ export function AdminAuthGate({
 
         <div className="bg-[#111827]/90 backdrop-blur-xl border border-[#00E5FF]/25 rounded-2xl p-6 sm:p-8 shadow-[0_24px_64px_rgba(0,0,0,0.65)] space-y-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 text-[11px] font-mono-nums uppercase tracking-[0.18em] text-[#00E5FF]">
-              <ShieldCheck className="w-4 h-4" />
-              <span>{BRAND_NAME} · Admin Portal</span>
+            <div className="flex items-center gap-2.5">
+              <img
+                src={BRAND_ICON_URL}
+                alt={BRAND_NAME}
+                className="w-9 h-9 rounded-xl object-cover border border-[#00E5FF]/35 shadow-[0_0_14px_rgba(0,229,255,0.2)] shrink-0"
+              />
+              <div className="inline-flex items-center gap-1.5 text-[11px] font-mono-nums uppercase tracking-[0.18em] text-[#00E5FF]">
+                <ShieldCheck className="w-4 h-4 shrink-0" />
+                <span>{BRAND_NAME} · Admin Portal</span>
+              </div>
             </div>
             <h1 className="text-2xl font-extrabold tracking-tight text-[#F5F7FA]">
               {needsSetup

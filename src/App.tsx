@@ -41,7 +41,6 @@ import { MailQueryModal } from "./components/MailQueryModal";
 import {
   LowerBannerShowcase,
   NativeAdBanner,
-  PopunderAd,
   ResponsiveHorizontalBanner,
   SocialBarAd,
 } from "./components/NativeAdBanner";
@@ -77,6 +76,7 @@ import { fetchPublicBootstrap } from "./utils/adminApi";
 import {
   BG_COLORS,
   BORDER_COLOR_PRESETS,
+  BRAND_ICON_URL,
   BRAND_NAME,
   OFFICIAL_SITE_URL,
   OFFICIAL_SUPPORT_EMAIL,
@@ -3058,7 +3058,6 @@ export default function App() {
         <ResponsiveHorizontalBanner />
         <NativeAdBanner />
         <SocialBarAd />
-        <PopunderAd />
 
         {/* Full Commercial Printing Showcase, Portfolio Gallery, Workflow, Quote, About & Contact */}
         <LandingSections
@@ -3102,8 +3101,15 @@ export default function App() {
         <div className="cyan-divider-glow" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 grid grid-cols-1 md:grid-cols-12 gap-8">
           <div className="md:col-span-5 space-y-3">
-            <div className="text-base font-extrabold tracking-wide text-[#F5F7FA]">
-              {BRAND_NAME}
+            <div className="inline-flex items-center gap-3">
+              <img
+                src={cmsData?.settings?.logoImageUrl?.trim() || BRAND_ICON_URL}
+                alt={BRAND_NAME}
+                className="w-10 h-10 rounded-xl object-cover border border-[#00E5FF]/35 shadow-[0_0_16px_rgba(0,229,255,0.2)] shrink-0"
+              />
+              <span className="text-base font-extrabold tracking-wide text-[#F5F7FA]">
+                {BRAND_NAME}
+              </span>
             </div>
             <p className="text-xs text-[#94A3B8] max-w-sm leading-relaxed">
               Premium futuristic digital printing and graphic design studio.

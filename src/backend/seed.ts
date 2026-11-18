@@ -1,12 +1,12 @@
 import { D1Database } from "./d1Types";
 import { ensureSchemaTables } from "./cloudflareStorage";
-import { BG_COLORS, BRAND_NAME, DRESS_PRESETS, OFFICIAL_SUPPORT_EMAIL } from "../types/photo";
+import { BG_COLORS, BRAND_ICON_URL, BRAND_NAME, DRESS_PRESETS, OFFICIAL_SUPPORT_EMAIL } from "../types/photo";
 import { WebsiteSettings } from "../types/cms";
 
 export const DEFAULT_WEBSITE_SETTINGS: WebsiteSettings = {
   brandName: BRAND_NAME,
   logoText: BRAND_NAME,
-  logoImageUrl: "",
+  logoImageUrl: BRAND_ICON_URL,
   heroEyebrow: `${BRAND_NAME} · Precision Digital Print Studio`,
   heroHeadlineTop: "BRING YOUR",
   heroHeadlineHighlight: "CREATIVITY",

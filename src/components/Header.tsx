@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Mail, Menu, X } from "lucide-react";
 import { WebsiteSettings } from "../types/cms";
-import { BRAND_NAME, OFFICIAL_SUPPORT_EMAIL } from "../types/photo";
+import { BRAND_ICON_URL, BRAND_NAME, OFFICIAL_SUPPORT_EMAIL } from "../types/photo";
 
 interface HeaderProps {
   onMailQuery: () => void;
@@ -21,7 +21,7 @@ export function Header({ onMailQuery, cmsSettings }: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const logoText = cmsSettings?.logoText?.trim() || BRAND_NAME;
-  const logoImageUrl = cmsSettings?.logoImageUrl?.trim() || "";
+  const logoImageUrl = cmsSettings?.logoImageUrl?.trim() || BRAND_ICON_URL;
   const navLinks =
     cmsSettings?.navLinks && cmsSettings.navLinks.length > 0
       ? cmsSettings.navLinks
@@ -34,15 +34,13 @@ export function Header({ onMailQuery, cmsSettings }: HeaderProps) {
       <div className="max-w-7xl mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4 lg:gap-6">
         <a
           href="#home"
-          className="inline-flex items-center gap-2 text-xs sm:text-sm md:text-base font-extrabold tracking-wide text-[#F5F7FA] whitespace-nowrap truncate min-w-0 hover:text-[#00E5FF] transition-colors"
+          className="inline-flex items-center gap-2.5 text-xs sm:text-sm md:text-base font-extrabold tracking-wide text-[#F5F7FA] whitespace-nowrap truncate min-w-0 hover:text-[#00E5FF] transition-colors"
         >
-          {logoImageUrl && (
-            <img
-              src={logoImageUrl}
-              alt={logoText}
-              className="w-7 h-7 rounded-lg object-cover border border-[#00E5FF]/30 shrink-0"
-            />
-          )}
+          <img
+            src={logoImageUrl}
+            alt={logoText}
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg object-cover border border-[#00E5FF]/35 shadow-[0_0_12px_rgba(0,229,255,0.2)] shrink-0"
+          />
           <span className="truncate">{logoText}</span>
         </a>
 

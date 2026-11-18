@@ -31,7 +31,7 @@ import {
   StorageStatusInfo,
   WebsiteSettings,
 } from "../../types/cms";
-import { BRAND_NAME } from "../../types/photo";
+import { BRAND_ICON_URL, BRAND_NAME } from "../../types/photo";
 import {
   fetchAdminActivity,
   fetchAdminBackgrounds,
@@ -219,13 +219,20 @@ export function AdminPortal({
     <div className="min-h-screen bg-[#080B12] text-[#F5F7FA] flex">
       {/* Desktop / Tablet Sidebar */}
       <aside className="hidden lg:flex lg:w-64 xl:w-72 flex-col bg-[#0B0F19] border-r border-[#00E5FF]/20 shrink-0 sticky top-0 h-screen">
-        <div className="p-5 border-b border-[#00E5FF]/15 space-y-1">
-          <div className="inline-flex items-center gap-2 text-xs font-mono-nums text-[#00E5FF] uppercase tracking-wider">
-            <ShieldCheck className="w-4 h-4" />
-            <span>Admin Studio</span>
-          </div>
-          <div className="text-sm font-extrabold text-[#F5F7FA] truncate">
-            {BRAND_NAME}
+        <div className="p-5 border-b border-[#00E5FF]/15 flex items-center gap-3">
+          <img
+            src={BRAND_ICON_URL}
+            alt={BRAND_NAME}
+            className="w-9 h-9 rounded-xl object-cover border border-[#00E5FF]/35 shadow-[0_0_12px_rgba(0,229,255,0.2)] shrink-0"
+          />
+          <div className="min-w-0 space-y-0.5">
+            <div className="inline-flex items-center gap-1.5 text-[11px] font-mono-nums text-[#00E5FF] uppercase tracking-wider">
+              <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+              <span>Admin Studio</span>
+            </div>
+            <div className="text-xs font-extrabold text-[#F5F7FA] truncate">
+              {BRAND_NAME}
+            </div>
           </div>
         </div>
 
@@ -281,10 +288,17 @@ export function AdminPortal({
       {sidebarOpen && (
         <div className="lg:hidden fixed inset-0 z-50 bg-[#080B12]/80 backdrop-blur-md flex">
           <aside className="w-72 max-w-[85vw] bg-[#0B0F19] border-r border-[#00E5FF]/25 flex flex-col h-full">
-            <div className="p-4 border-b border-white/10 flex items-center justify-between">
-              <span className="text-xs font-extrabold text-[#00E5FF]">
-                {BRAND_NAME} ADMIN
-              </span>
+            <div className="p-4 border-b border-white/10 flex items-center justify-between gap-2">
+              <div className="inline-flex items-center gap-2 min-w-0">
+                <img
+                  src={BRAND_ICON_URL}
+                  alt={BRAND_NAME}
+                  className="w-7 h-7 rounded-lg object-cover border border-[#00E5FF]/35 shrink-0"
+                />
+                <span className="text-xs font-extrabold text-[#00E5FF] truncate">
+                  {BRAND_NAME} ADMIN
+                </span>
+              </div>
               <button
                 type="button"
                 onClick={() => setSidebarOpen(false)}

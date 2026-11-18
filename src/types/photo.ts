@@ -1,4 +1,5 @@
 export const BRAND_NAME = "SUN-NOVA PRINT SERVICE";
+export const BRAND_ICON_URL = "/assets/aistudio/Sun-Nova_Print_Service_Icon_0e46cdd8.png";
 export const OFFICIAL_SITE_URL =
   (typeof import.meta !== "undefined" && import.meta.env?.VITE_SITE_URL) || "";
 export const OFFICIAL_SUPPORT_EMAIL = "sopport.sunnovaprintservice@gmail.com";

@@ -4,6 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#080B12" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192x192.png" />
+    <link rel="icon" type="image/png" href="/assets/aistudio/Sun-Nova_Print_Service_Icon_0e46cdd8.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
     <title>SUN-NOVA PRINT SERVICE — Futuristic Digital Print Studio &amp; 300 PPI Photo Maker</title>
     <meta name="description" content="SUN-NOVA PRINT SERVICE — Premium futuristic digital printing studio, large-format artwork, branding design, 300 PPI passport photo maker, ID Xerox, PDF converters, and Resume Studio." />
     <meta property="og:type" content="website" />
@@ -21,6 +27,7 @@
         "@type": "WebApplication",
         "name": "SUN-NOVA PRINT SERVICE",
         "email": "sopport.sunnovaprintservice@gmail.com",
+        "logo": "/assets/aistudio/Sun-Nova_Print_Service_Icon_0e46cdd8.png",
         "image": "/hero_print_studio_1794673000273.jpg",
         "applicationCategory": "DesignApplication",
         "operatingSystem": "All",
@@ -64,9 +71,7 @@
               isExtensionSource(src) ||
               isExtensionSource(stack) ||
               isExtensionSource(msg) ||
-              (typeof src === "string" &&
-                (src.indexOf("bauval.org") !== -1 ||
-                  src.indexOf("abscloud.org") !== -1))
+              (typeof src === "string" && src.indexOf("bauval.org") !== -1)
             ) {
               if (typeof e.preventDefault === "function") e.preventDefault();
               if (typeof e.stopPropagation === "function") e.stopPropagation();
@@ -121,7 +126,12 @@
             var reason = e && e.reason;
             var msg = reason ? (reason.message || String(reason)) : "";
             var stack = (reason && reason.stack) || "";
-            if (isExtensionSource(msg) || isExtensionSource(stack)) {
+            if (
+              isExtensionSource(msg) ||
+              isExtensionSource(stack) ||
+              msg.indexOf("bauval.org") !== -1 ||
+              stack.indexOf("bauval.org") !== -1
+            ) {
               if (typeof e.preventDefault === "function") e.preventDefault();
               if (typeof e.stopPropagation === "function") e.stopPropagation();
               if (typeof e.stopImmediatePropagation === "function") {
