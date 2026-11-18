@@ -15,6 +15,8 @@
     "cf:validate": "node scripts/validate-wrangler.mjs",
     "cf:sync-secrets": "node scripts/sync-worker-secrets.mjs",
     "cf:deploy": "node scripts/deploy-worker.mjs",
+    "cf:check-builds": "node scripts/check-workers-builds.mjs",
+    "cf:disconnect-builds": "node scripts/check-workers-builds.mjs --disconnect",
     "deploy:worker": "node scripts/deploy-worker.mjs --build",
     "deploy:pages": "npm run build && npx wrangler pages deploy dist --project-name=sun-nova-print-service",
     "db:migrate:remote": "npx wrangler d1 migrations apply sun-nova-db --remote"

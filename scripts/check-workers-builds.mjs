@@ -1,0 +1,168 @@
+import fs from "node:fs";
+import path from "node:path";
+import { stripJsonComments } from "./validate-wrangler.mjs";
+
+const rootDir = process.cwd();
+
+function getWorkerName() {
+  const wranglerPath = path.join(rootDir, "wrangler.jsonc");
+  if (!fs.existsSync(wranglerPath)) return "sun-nova-print-service";
+  try {
+    const parsed = JSON.parse(stripJsonComments(fs.readFileSync(wranglerPath, "utf8")));
+    return parsed?.name || "sun-nova-print-service";
+  } catch {
+    return "sun-nova-print-service";
+  }
+}
+
+function readEnvValue(key) {
+  const fromEnv = (process.env[key] || "").trim();
+  if (fromEnv) return fromEnv;
+  const envPath = path.join(rootDir, ".env");
+  if (!fs.existsSync(envPath)) return "";
+  for (const line of fs.readFileSync(envPath, "utf8").split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eqIdx = trimmed.indexOf("=");
+    if (eqIdx <= 0) continue;
+    if (trimmed.slice(0, eqIdx).trim() !== key) continue;
+    return trimmed
+      .slice(eqIdx + 1)
+      .trim()
+      .replace(/^["']|["']$/g, "");
+  }
+  return "";
+}
+
+async function cfRequest(token, url, method = "GET") {
+  const res = await fetch(url, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+  let body = null;
+  try {
+    body = await res.json();
+  } catch {
+    body = null;
+  }
+  return { ok: res.ok, status: res.status, body };
+}
+
+function appendGithubEnv(vars) {
+  const envFile = process.env.GITHUB_ENV;
+  if (!envFile) return;
+  const lines = Object.entries(vars)
+    .filter(([, val]) => Boolean(val))
+    .map(([k, v]) => `${k}=${String(v).replace(/[\r\n]/g, "")}`);
+  if (lines.length > 0) {
+    fs.appendFileSync(envFile, `${lines.join("\n")}\n`, "utf8");
+  }
+}
+
+async function main() {
+  const dryRun = process.argv.includes("--dry-run");
+  const disconnect = process.argv.includes("--disconnect");
+  const warnOnly = process.argv.includes("--warn-only");
+  const workerName = getWorkerName();
+  const dashboardPath = `Cloudflare Dashboard -> Compute (Workers & Pages) -> ${workerName} -> Settings -> Builds -> Disconnect`;
+
+  if (dryRun) {
+    console.log(
+      `[cf-builds] Dry run — would audit legacy Workers Builds triggers for "${workerName}"${
+        disconnect ? " and disconnect active Git triggers if permitted" : ""
+      }.`
+    );
+    appendGithubEnv({ LEGACY_CF_BUILDS_STATUS: "dry-run" });
+    return;
+  }
+
+  const token = readEnvValue("CLOUDFLARE_API_TOKEN");
+  const accountId = readEnvValue("CLOUDFLARE_ACCOUNT_ID");
+
+  if (!token || !accountId) {
+    const msg = `CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are not set. Disconnect legacy Git builds manually at: ${dashboardPath}`;
+    if (warnOnly) {
+      console.log(`[cf-builds] ${msg}`);
+      appendGithubEnv({ LEGACY_CF_BUILDS_STATUS: "unknown (no credentials)" });
+      return;
+    }
+    throw new Error(msg);
+  }
+
+  const listUrl = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(
+    accountId
+  )}/builds/workers/${encodeURIComponent(workerName)}/triggers`;
+
+  const res = await cfRequest(token, listUrl, "GET");
+
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403 || res.status === 404) {
+      console.log(
+        `[cf-builds] Workers Builds API unavailable for this token/worker (HTTP ${res.status}). If Cloudflare still runs failing 'dist' builds, click Disconnect at: ${dashboardPath}`
+      );
+      appendGithubEnv({
+        LEGACY_CF_BUILDS_STATUS: `manual-check-required (HTTP ${res.status})`,
+      });
+      return;
+    }
+    const errMsg = `Cloudflare API returned HTTP ${res.status} while checking Workers Builds triggers.`;
+    if (warnOnly) {
+      console.warn(`[cf-builds] Warning: ${errMsg}`);
+      appendGithubEnv({ LEGACY_CF_BUILDS_STATUS: "manual-check-required" });
+      return;
+    }
+    throw new Error(errMsg);
+  }
+
+  const triggers = Array.isArray(res.body?.result) ? res.body.result : [];
+  if (triggers.length === 0) {
+    console.log(`[cf-builds] OK: No legacy Cloudflare Workers Builds Git triggers remain on "${workerName}".`);
+    appendGithubEnv({ LEGACY_CF_BUILDS_STATUS: "disconnected" });
+    return;
+  }
+
+  console.warn(
+    `[cf-builds] Notice: Found ${triggers.length} active Cloudflare Workers Builds trigger(s) on "${workerName}".`
+  );
+
+  if (!disconnect) {
+    console.warn(`[cf-builds] Run \`npm run cf:disconnect-builds\` or click Disconnect at: ${dashboardPath}`);
+    appendGithubEnv({
+      LEGACY_CF_BUILDS_STATUS: `active (${triggers.length} trigger(s) — disconnect in Cloudflare Settings -> Builds)`,
+    });
+    return;
+  }
+
+  let removed = 0;
+  for (const trigger of triggers) {
+    const triggerId = trigger?.trigger_uuid || trigger?.id;
+    if (!triggerId) continue;
+    const delUrl = `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(
+      accountId
+    )}/builds/triggers/${encodeURIComponent(triggerId)}`;
+    const delRes = await cfRequest(token, delUrl, "DELETE");
+    if (delRes.ok) {
+      removed += 1;
+      console.log(`[cf-builds] Disconnected legacy Workers Builds trigger ${triggerId}.`);
+    } else {
+      console.warn(
+        `[cf-builds] Could not delete trigger ${triggerId} via API (HTTP ${delRes.status}). Disconnect manually at: ${dashboardPath}`
+      );
+    }
+  }
+
+  appendGithubEnv({
+    LEGACY_CF_BUILDS_STATUS:
+      removed === triggers.length
+        ? "disconnected"
+        : `active (${triggers.length - removed} remaining — disconnect in Dashboard)`,
+  });
+}
+
+main().catch((err) => {
+  console.error(`[cf-builds] ERROR: ${err instanceof Error ? err.message : String(err)}`);
+  process.exit(1);
+});

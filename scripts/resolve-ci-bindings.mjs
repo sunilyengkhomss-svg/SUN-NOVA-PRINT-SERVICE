@@ -57,6 +57,12 @@ function resolveOrCreateD1(dryRun) {
   return match.uuid;
 }
 
+function isNonFatalR2Error(msg) {
+  return /10042|enable R2|onboarding|not enabled|9109|10000|403|unauthorized|authentication error|permission/i.test(
+    msg
+  );
+}
+
 function resolveOrCreateR2(dryRun) {
   if (dryRun) {
     console.log(`[cf-ci] Dry run — would resolve or create R2 bucket "${BUCKET_NAME}".`);
@@ -71,9 +77,9 @@ function resolveOrCreateR2(dryRun) {
     }
   } catch (err) {
     const msg = String(err?.stderr || err?.message || err);
-    if (/10042|enable R2|onboarding|not enabled/i.test(msg)) {
+    if (isNonFatalR2Error(msg)) {
       console.warn(
-        `[cf-ci] Warning: R2 is not enabled on this Cloudflare account yet (${BUCKET_NAME} skipped; Worker will use D1 blob fallback until R2 is enabled in Dashboard).`
+        `[cf-ci] Warning: R2 unavailable or token lacks R2 scope (${BUCKET_NAME} skipped; Worker will use D1 blob fallback until R2 is enabled/permitted).`
       );
       return "";
     }
@@ -88,9 +94,9 @@ function resolveOrCreateR2(dryRun) {
     if (msg.includes("already exists") || msg.includes("10004")) {
       return BUCKET_NAME;
     }
-    if (/10042|enable R2|onboarding|not enabled/i.test(msg)) {
+    if (isNonFatalR2Error(msg)) {
       console.warn(
-        `[cf-ci] Warning: R2 is not enabled on this Cloudflare account yet (${BUCKET_NAME} skipped; Worker will use D1 blob fallback until R2 is enabled in Dashboard).`
+        `[cf-ci] Warning: R2 unavailable or token lacks R2 scope (${BUCKET_NAME} skipped; Worker will use D1 blob fallback until R2 is enabled/permitted).`
       );
       return "";
     }
@@ -151,6 +157,7 @@ function main() {
     D1_DATABASE_ID: dbId,
     D1_DATABASE_NAME: DB_NAME,
     R2_BUCKET_NAME: bucketName,
+    R2_STATUS: bucketName ? `bound (${bucketName})` : "d1-blob-fallback",
   });
 
   console.log(

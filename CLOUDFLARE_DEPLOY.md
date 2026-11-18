@@ -34,8 +34,9 @@ This repository includes `.github/workflows/deploy.yml`, which handles everythin
      - `RESEND_API_KEY` *(optional — sends Admin Mail Desk replies & password reset emails)*
      - `GEMINI_API_KEY` *(optional — enables Ask AI Agent, OCR & Resume AI)*
    - Optional **Repository variables** (**Actions → Variables** tab): `VITE_SITE_URL`, `VITE_BASE_URL`, `EMAIL_FROM`, `D1_DATABASE_NAME`, `R2_BUCKET_NAME`, `BUNDLE_ORT_WASM`.
-4. **Trigger Deploy:**
-   - Open the **Actions** tab in GitHub → **Deploy to Cloudflare Workers** → **Run workflow** (or push to `main`).
+4. **Verify & View Live Deployments in GitHub Actions:**
+   - Open your GitHub repo → **Actions** tab → **Deploy to Cloudflare Workers** (do not look at Cloudflare's old **Builds** tab once disconnected).
+   - Each run prints a summary table showing D1 status, R2 status (`bound` or `d1-blob-fallback` if R2 is not enabled yet), and whether any legacy Cloudflare Workers Builds triggers remain attached.
 
 ---
 
@@ -53,7 +54,8 @@ If you prefer Cloudflare's built-in Git trigger instead of disconnecting it:
 ## CLI Validation & Management Scripts
 
 - **`npm run cf:setup`**: One-command local setup creating `sun-nova-db` (D1) & `sun-nova-media` (R2), running remote migrations, and writing bindings to `wrangler.jsonc`.
-- **`npm run cf:ci-resolve`**: Non-interactive CI helper to look up/create D1 & R2 and apply remote migrations.
+- **`npm run cf:ci-resolve`**: Non-interactive CI helper to look up/create D1 & R2 (falling back cleanly to D1 blob storage if R2 is unavailable or unpermitted) and apply remote migrations.
+- **`npm run cf:check-builds`** / **`npm run cf:disconnect-builds`**: Audits or attempts to disconnect legacy Cloudflare Workers Builds Git triggers using `CLOUDFLARE_API_TOKEN` & `CLOUDFLARE_ACCOUNT_ID`.
 - **`npm run cf:validate`**: Validates `wrangler.jsonc`, bundles `src/worker.ts` (zero Node.js built-ins), and enforces Cloudflare's **25 MiB** per-asset cap.
 - **`npm run cf:sync-secrets`**: Pushes runtime secrets securely via `npx wrangler secret bulk`.
 - **`npm run cf:deploy`**: Runs binding sync, `cf:validate`, and `npx wrangler deploy`.
