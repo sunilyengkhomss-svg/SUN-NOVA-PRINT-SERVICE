@@ -91,7 +91,17 @@
                       showBootError("Failed to load application script (" + failedSrc + "): HTTP " + r.status + " (" + ct + ")" + extra);
                     })
                     .catch(function (fe) {
-                      showBootError("Failed to load application script (" + failedSrc + "): " + (fe && fe.message ? fe.message : "Network blocked or aborted."));
+                      window.fetch(failedSrc, { redirect: "manual", cache: "no-store" })
+                        .then(function (mr) {
+                          if (mr && mr.type === "opaqueredirect") {
+                            showBootError("Blocked by a cross-origin redirect on " + failedSrc + " (check Cloudflare Access / Zero Trust login rules).");
+                          } else {
+                            showBootError("Failed to load application script (" + failedSrc + "): " + (fe && fe.message ? fe.message : "Network blocked or aborted."));
+                          }
+                        })
+                        .catch(function () {
+                          showBootError("Failed to load application script (" + failedSrc + "): " + (fe && fe.message ? fe.message : "Failed to fetch") + " — network/ISP, firewall, or browser extension blocked the request to *.workers.dev.");
+                        });
                     });
                 }
               }
