@@ -2,7 +2,6 @@
 
 This application uses **React + TypeScript + Vite** for the frontend and a **Cloudflare Pages Functions / Cloudflare Workers + Cloudflare D1 (SQLite) + Cloudflare R2** backend. In local development (`npm run dev`), `server.ts` runs local adapters (`node:sqlite` in `.local-backend/sunnova.db` and local disk R2 emulation in `.local-backend/r2/`).
 
-- **Official Website:** `https://sun-nova-print-service.pages.dev/`
 - **Official Support Email:** `sopport.sunnovaprintservice@gmail.com`
 
 ---
@@ -74,6 +73,6 @@ Your `wrangler.jsonc` targets worker name `sun-nova-print-service` (`main: "src/
 
 No hardcoded plaintext admin password exists in the codebase.
 
-1. Visit `/admin` on your deployed site (`https://sun-nova-print-service.pages.dev/admin`).
+1. Visit `/admin` on your deployed site.
 2. Check **Cloudflare Bindings & Storage Status** after login on Dashboard Overview to verify `DB` and `MEDIA_BUCKET` both show **Bound**.
 3. Enter your **Full Name**, **Admin Email** (`sopport.sunnovaprintservice@gmail.com` or your chosen owner email), and a **Strong Password** (minimum 8 characters) to provision `super_admin`.

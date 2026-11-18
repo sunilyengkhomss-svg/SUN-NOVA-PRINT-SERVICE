@@ -3108,15 +3108,17 @@ export default function App() {
                 {OFFICIAL_SUPPORT_EMAIL}
               </a>
             </p>
-            <p className="text-xs font-mono-nums text-[#94A3B8] break-all">
-              Official Website:{" "}
-              <a
-                href={OFFICIAL_SITE_URL}
-                className="text-[#00E5FF] hover:underline"
-              >
-                {OFFICIAL_SITE_URL.replace(/^https?:\/\//, "").replace(/\/$/, "")}
-              </a>
-            </p>
+            {OFFICIAL_SITE_URL && (
+              <p className="text-xs font-mono-nums text-[#94A3B8] break-all">
+                Official Website:{" "}
+                <a
+                  href={OFFICIAL_SITE_URL}
+                  className="text-[#00E5FF] hover:underline"
+                >
+                  {OFFICIAL_SITE_URL.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+                </a>
+              </p>
+            )}
           </div>
 
           <div className="md:col-span-3 space-y-2.5 text-xs">
