@@ -9,7 +9,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "deploy:worker": "npm run build && npx wrangler deploy",
+    "deploy:pages": "npm run build && npx wrangler pages deploy dist --project-name=sun-nova-print-service",
+    "db:migrate:remote": "npx wrangler d1 migrations apply sun-nova-db --remote"
   },
   "dependencies": {
     "@google/genai": "^3.3.0",

@@ -1,4 +1,5 @@
 import { D1Database } from "./d1Types";
+import { ensureSchemaTables } from "./cloudflareStorage";
 import { BG_COLORS, BRAND_NAME, DRESS_PRESETS, OFFICIAL_SUPPORT_EMAIL } from "../types/photo";
 import { WebsiteSettings } from "../types/cms";
 
@@ -237,10 +238,11 @@ const DEFAULT_PORTFOLIO_SEED = [
   },
 ];
 
-let seededInProcess = false;
+const seededDbs = new WeakSet<D1Database>();
 
 export async function ensureSeeded(db: D1Database): Promise<void> {
-  if (seededInProcess) return;
+  if (seededDbs.has(db)) return;
+  await ensureSchemaTables(db);
   const now = new Date().toISOString();
 
   // Website settings
@@ -339,7 +341,7 @@ export async function ensureSeeded(db: D1Database): Promise<void> {
     }
   }
 
-  seededInProcess = true;
+  seededDbs.add(db);
 }
 
 export async function readWebsiteSettings(db: D1Database): Promise<WebsiteSettings> {

@@ -1,14 +1,19 @@
 import {
   Activity,
+  AlertTriangle,
   Briefcase,
+  CheckCircle2,
+  Database,
   FileText,
   FolderOpen,
+  HardDrive,
   Image as ImageIcon,
   LayoutGrid,
   Mail,
   Palette,
   Plus,
   Shirt,
+  Sparkles,
   Upload,
   UserCheck,
 } from "lucide-react";
@@ -48,6 +53,7 @@ export function AdminOverviewTab({
     unreadMessages: 0,
     totalMessages: 0,
   };
+  const storageStatus = overview?.storageStatus;
 
   const statCards = [
     {
@@ -58,7 +64,7 @@ export function AdminOverviewTab({
       tab: "media" as AdminSectionKey,
     },
     {
-      label: "Uploaded PDFs",
+      label: "Uploaded Files",
       value: counts.totalFiles,
       icon: FileText,
       accent: "text-[#8B5CF6]",
@@ -126,6 +132,15 @@ export function AdminOverviewTab({
   ];
   const maxBar = Math.max(1, ...chartBars.map((b) => b.count));
 
+  const storageModeLabel =
+    storageStatus?.mode === "d1+r2"
+      ? "D1 + R2 Bound"
+      : storageStatus?.mode === "d1+d1blob"
+      ? "D1 + Blob Adapter"
+      : storageStatus?.mode === "memory-fallback"
+      ? "Temporary Fallback Mode"
+      : "Live Storage";
+
   return (
     <div className="space-y-6">
       {/* Quick Actions */}
@@ -133,7 +148,7 @@ export function AdminOverviewTab({
         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
           <h2 className="text-sm font-bold text-[#F5F7FA]">Quick Studio Actions</h2>
           <span className="text-[11px] font-mono-nums text-[#94A3B8]">
-            Live D1 + R2 Storage
+            {storageModeLabel}
           </span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2.5">
@@ -187,6 +202,137 @@ export function AdminOverviewTab({
           </button>
         </div>
       </div>
+
+      {/* Cloudflare Bindings & Storage Diagnostics */}
+      {storageStatus && (
+        <div
+          className={`rounded-2xl p-4 sm:p-5 border ${
+            storageStatus.d1Bound && storageStatus.r2Bound
+              ? "bg-[#111827]/85 border-emerald-500/25"
+              : "bg-[#111827]/90 border-amber-400/35"
+          }`}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <div className="flex items-center gap-2">
+              {storageStatus.d1Bound && storageStatus.r2Bound ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              ) : (
+                <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0" />
+              )}
+              <h2 className="text-sm font-bold text-[#F5F7FA]">
+                Cloudflare Bindings &amp; Storage Status
+              </h2>
+            </div>
+            <span className="text-[11px] font-mono-nums text-[#94A3B8]">
+              Mode: {storageStatus.mode}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl bg-[#080B12]/75 border border-white/10">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Database
+                  className={`w-4 h-4 shrink-0 ${
+                    storageStatus.d1Bound ? "text-emerald-400" : "text-amber-300"
+                  }`}
+                />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-[#F5F7FA] truncate">
+                    D1 Database (<span className="font-mono-nums">DB</span>)
+                  </p>
+                  <p className="text-[11px] text-[#94A3B8] truncate">
+                    {storageStatus.d1Bound ? "Persistent SQLite bound" : "Isolate fallback active"}
+                  </p>
+                </div>
+              </div>
+              <span
+                className={`text-[11px] font-mono-nums font-semibold shrink-0 ${
+                  storageStatus.d1Bound ? "text-emerald-400" : "text-amber-300"
+                }`}
+              >
+                {storageStatus.d1Bound ? "Bound" : "Fallback"}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl bg-[#080B12]/75 border border-white/10">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <HardDrive
+                  className={`w-4 h-4 shrink-0 ${
+                    storageStatus.r2Bound ? "text-emerald-400" : "text-amber-300"
+                  }`}
+                />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-[#F5F7FA] truncate">
+                    R2 Bucket (<span className="font-mono-nums">MEDIA_BUCKET</span>)
+                  </p>
+                  <p className="text-[11px] text-[#94A3B8] truncate">
+                    {storageStatus.r2Bound
+                      ? "Object storage bound"
+                      : storageStatus.d1Bound
+                      ? "D1 blob adapter (1.5 MB)"
+                      : "Memory adapter active"}
+                  </p>
+                </div>
+              </div>
+              <span
+                className={`text-[11px] font-mono-nums font-semibold shrink-0 ${
+                  storageStatus.r2Bound ? "text-emerald-400" : "text-amber-300"
+                }`}
+              >
+                {storageStatus.r2Bound ? "Bound" : "Fallback"}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl bg-[#080B12]/75 border border-white/10">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Sparkles
+                  className={`w-4 h-4 shrink-0 ${
+                    storageStatus.geminiConfigured ? "text-emerald-400" : "text-[#94A3B8]"
+                  }`}
+                />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-[#F5F7FA] truncate">
+                    Gemini AI (<span className="font-mono-nums">GEMINI_API_KEY</span>)
+                  </p>
+                  <p className="text-[11px] text-[#94A3B8] truncate">
+                    {storageStatus.geminiConfigured
+                      ? "Chat, OCR & Resume AI active"
+                      : "Optional server secret"}
+                  </p>
+                </div>
+              </div>
+              <span
+                className={`text-[11px] font-mono-nums font-semibold shrink-0 ${
+                  storageStatus.geminiConfigured ? "text-emerald-400" : "text-[#94A3B8]"
+                }`}
+              >
+                {storageStatus.geminiConfigured ? "Configured" : "Not Set"}
+              </span>
+            </div>
+          </div>
+
+          {(!storageStatus.d1Bound || !storageStatus.r2Bound) && (
+            <div className="mt-3 pt-3 border-t border-white/10 text-xs text-[#CBD5E1] space-y-1.5">
+              <p className="font-semibold text-amber-200">
+                {storageStatus.summary}
+              </p>
+              <ul className="list-disc pl-4 space-y-1 text-[11px] text-[#94A3B8]">
+                <li>
+                  <span className="text-[#E2E8F0] font-semibold">Cloudflare Pages (Functions):</span>{" "}
+                  Open <span className="text-[#E2E8F0]">Settings → Functions → Bindings</span> and attach D1 variable{" "}
+                  <code className="text-[#00E5FF]">DB</code> (<code className="text-[#E2E8F0]">sun-nova-db</code>) and R2 variable{" "}
+                  <code className="text-[#00E5FF]">MEDIA_BUCKET</code> (<code className="text-[#E2E8F0]">sun-nova-media</code>), then redeploy.
+                </li>
+                <li>
+                  <span className="text-[#E2E8F0] font-semibold">Cloudflare Workers (npx wrangler deploy):</span>{" "}
+                  Attach <code className="text-[#00E5FF]">DB</code> &amp; <code className="text-[#00E5FF]">MEDIA_BUCKET</code> in{" "}
+                  <span className="text-[#E2E8F0]">Workers &amp; Pages → sun-nova-print-service → Settings → Bindings</span> or uncomment them with your D1 ID in <code className="text-[#E2E8F0]">wrangler.jsonc</code>.
+                </li>
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://sun-nova-print-service.pages.dev/sitemap.xml
+Sitemap: https://sun-nova-print-service.workers.dev/sitemap.xml

@@ -198,6 +198,14 @@ export interface PublicBootstrapPayload {
   portfolio: PortfolioItemRecord[];
 }
 
+export interface StorageStatusInfo {
+  d1Bound: boolean;
+  r2Bound: boolean;
+  geminiConfigured: boolean;
+  mode: "d1+r2" | "d1+d1blob" | "memory-fallback";
+  summary: string;
+}
+
 export interface AdminOverviewPayload {
   counts: {
     totalImages: number;
@@ -214,4 +222,5 @@ export interface AdminOverviewPayload {
   quotesByStatus: { status: string; count: number }[];
   recentUploads: MediaFileRecord[];
   recentActivity: ActivityLogRecord[];
+  storageStatus?: StorageStatusInfo;
 }

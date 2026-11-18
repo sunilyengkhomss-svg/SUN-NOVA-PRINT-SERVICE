@@ -1,24 +1,26 @@
 {
-  "name": "sun-nova-print-services",
+  "name": "sun-nova-print-service",
   "main": "src/worker.ts",
   "compatibility_date": "2025-05-01",
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application"
-  },
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "sun-nova-db",
-      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID",
-      "migrations_dir": "migrations"
-    }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "MEDIA_BUCKET",
-      "bucket_name": "sun-nova-media"
-    }
-  ]
+  }
+  // Bind D1 (DB) and R2 (MEDIA_BUCKET) in Cloudflare Dashboard -> Settings -> Bindings
+  // (for Pages Functions AND Workers), or uncomment below once you create them via Wrangler:
+  // "d1_databases": [
+  //   {
+  //     "binding": "DB",
+  //     "database_name": "sun-nova-db",
+  //     "database_id": "<PASTE_D1_DATABASE_ID_HERE>",
+  //     "migrations_dir": "migrations"
+  //   }
+  // ],
+  // "r2_buckets": [
+  //   {
+  //     "binding": "MEDIA_BUCKET",
+  //     "bucket_name": "sun-nova-media"
+  //   }
+  // ]
 }

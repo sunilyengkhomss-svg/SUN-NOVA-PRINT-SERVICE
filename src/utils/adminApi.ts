@@ -15,6 +15,7 @@ import {
   QuoteStatus,
   SamplePortraitRecord,
   ServiceRecord,
+  StorageStatusInfo,
   WebsiteSettings,
 } from "../types/cms";
 
@@ -76,6 +77,7 @@ export async function fetchBootstrapStatus(): Promise<{
   needsSetup: boolean;
   setupTokenRequired: boolean;
   admin?: AdminUser | null;
+  storageStatus?: StorageStatusInfo;
 }> {
   return apiRequest("/api/admin/bootstrap-status");
 }

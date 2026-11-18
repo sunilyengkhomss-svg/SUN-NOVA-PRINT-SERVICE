@@ -12,6 +12,7 @@ import {
   verifyPassword,
 } from "./crypto";
 import { AppWorkerEnv, D1Database, R2Bucket } from "./d1Types";
+import { resolveStorageBindings } from "./cloudflareStorage";
 import { DEFAULT_WEBSITE_SETTINGS, ensureSeeded, readWebsiteSettings } from "./seed";
 import {
   ActivityLogRecord,
@@ -344,33 +345,34 @@ export async function handleApiRequest(
     return null;
   }
 
-  // Health endpoint (also checks D1 & R2 presence)
+  // Health endpoint (checks live D1, R2, and fallback storage mode)
   if (path === "/api/health" && request.method === "GET") {
+    const { storageStatus } = resolveStorageBindings(env);
     return json({
       ok: true,
-      dbConfigured: Boolean(env.DB),
-      r2Configured: Boolean(env.MEDIA_BUCKET),
+      dbConfigured: storageStatus.d1Bound,
+      r2Configured: storageStatus.r2Bound,
+      geminiConfigured: storageStatus.geminiConfigured,
+      storageStatus,
     });
   }
 
-  // Public media streaming from R2 (strictly public/ prefix only)
+  // Public media streaming from R2 / D1-blob / memory storage (strictly public/ prefix only)
   if (path.startsWith("/api/media/public/") && request.method === "GET") {
-    if (!env.DB || !env.MEDIA_BUCKET) {
-      return json({ error: "Storage bindings are not configured." }, 503);
-    }
+    const { db, bucket } = resolveStorageBindings(env);
+    await ensureSeeded(db);
     const rawKey = decodeURIComponent(path.slice("/api/media/public/".length));
     if (!rawKey.startsWith("public/") || rawKey.includes("..")) {
       return json({ error: "Forbidden asset path." }, 403);
     }
-    const mediaRow = await env.DB.prepare(
-      "SELECT visibility, mime_type FROM media_files WHERE r2_key = ?"
-    )
+    const mediaRow = await db
+      .prepare("SELECT visibility, mime_type FROM media_files WHERE r2_key = ?")
       .bind(rawKey)
       .first<{ visibility: string; mime_type: string }>();
     if (!mediaRow || mediaRow.visibility !== "public") {
       return json({ error: "Asset not found or not public." }, 404);
     }
-    const obj = await env.MEDIA_BUCKET.get(rawKey);
+    const obj = await bucket.get(rawKey);
     if (!obj) {
       return json({ error: "Object not found in storage." }, 404);
     }
@@ -392,19 +394,7 @@ export async function handleApiRequest(
     return new Response(obj.body, { status: 200, headers });
   }
 
-  // Require D1 and R2 for CMS & Admin API routes
-  if (!env.DB || !env.MEDIA_BUCKET) {
-    return json(
-      {
-        error:
-          "Cloudflare D1 (DB) and R2 (MEDIA_BUCKET) bindings are not configured. See CLOUDFLARE_DEPLOY.md.",
-      },
-      503
-    );
-  }
-
-  const db = env.DB;
-  const bucket = env.MEDIA_BUCKET;
+  const { db, bucket, storageStatus } = resolveStorageBindings(env);
 
   try {
     await ensureSeeded(db);
@@ -622,6 +612,7 @@ export async function handleApiRequest(
         needsSetup: !row || Number(row.cnt) === 0,
         setupTokenRequired: Boolean(env.ADMIN_SETUP_TOKEN),
         admin: sessionAdmin,
+        storageStatus,
       });
     }
 
@@ -1046,6 +1037,7 @@ export async function handleApiRequest(
         quotesByStatus: quoteStatusRes.results,
         recentUploads: recentUploadsRes.results,
         recentActivity: recentActivityRes.results,
+        storageStatus,
       };
       return json(payload);
     }
