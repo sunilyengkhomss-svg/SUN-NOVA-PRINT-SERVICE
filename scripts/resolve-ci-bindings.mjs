@@ -69,21 +69,53 @@ function resolveOrCreateR2(dryRun) {
       console.log(`[cf-ci] Resolved R2 bucket "${BUCKET_NAME}".`);
       return BUCKET_NAME;
     }
-  } catch {
-    // Fall through to creation attempt
+  } catch (err) {
+    const msg = String(err?.stderr || err?.message || err);
+    if (/10042|enable R2|onboarding|not enabled/i.test(msg)) {
+      console.warn(
+        `[cf-ci] Warning: R2 is not enabled on this Cloudflare account yet (${BUCKET_NAME} skipped; Worker will use D1 blob fallback until R2 is enabled in Dashboard).`
+      );
+      return "";
+    }
   }
 
   console.log(`[cf-ci] Creating R2 bucket "${BUCKET_NAME}"...`);
   try {
     runWrangler(["r2", "bucket", "create", BUCKET_NAME], { inherit: true });
+    return BUCKET_NAME;
   } catch (err) {
     const msg = String(err?.stderr || err?.message || err);
-    if (!msg.includes("already exists") && !msg.includes("10004")) {
-      throw err;
+    if (msg.includes("already exists") || msg.includes("10004")) {
+      return BUCKET_NAME;
     }
+    if (/10042|enable R2|onboarding|not enabled/i.test(msg)) {
+      console.warn(
+        `[cf-ci] Warning: R2 is not enabled on this Cloudflare account yet (${BUCKET_NAME} skipped; Worker will use D1 blob fallback until R2 is enabled in Dashboard).`
+      );
+      return "";
+    }
+    throw err;
+  }
+}
+
+function syncWranglerNow(dbId, bucketName, dryRun) {
+  if (dryRun) {
+    console.log(
+      `[cf-ci] Dry run — would inject D1 (${DB_NAME})${bucketName ? ` & R2 (${bucketName})` : ""} into wrangler.jsonc before applying migrations.`
+    );
+    return;
   }
 
-  return BUCKET_NAME;
+  execFileSync("node", ["scripts/sync-wrangler-bindings.mjs"], {
+    cwd: rootDir,
+    env: {
+      ...process.env,
+      D1_DATABASE_ID: dbId,
+      D1_DATABASE_NAME: DB_NAME,
+      R2_BUCKET_NAME: bucketName || "",
+    },
+    stdio: "inherit",
+  });
 }
 
 function applyRemoteMigrations(dryRun) {
@@ -108,6 +140,9 @@ function main() {
   const dbId = resolveOrCreateD1(dryRun);
   const bucketName = resolveOrCreateR2(dryRun);
 
+  // Must inject D1 binding into wrangler.jsonc BEFORE running `wrangler d1 migrations apply --remote`
+  syncWranglerNow(dbId, bucketName, dryRun);
+
   if (!skipMigrations) {
     applyRemoteMigrations(dryRun);
   }
@@ -119,7 +154,7 @@ function main() {
   });
 
   console.log(
-    `[cf-ci] Exported CI bindings: D1=${DB_NAME}, R2=${bucketName}${
+    `[cf-ci] Exported CI bindings: D1=${DB_NAME}, R2=${bucketName || "fallback-only"}${
       process.env.GITHUB_ENV ? " (written to GITHUB_ENV)" : ""
     }.`
   );
