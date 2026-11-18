@@ -36,12 +36,21 @@ import heroPrintImg from "../assets/images/hero_print_studio_1794673000273.jpg";
 import serviceCardsImg from "../assets/images/service_business_cards_1794673000584.jpg";
 import serviceLargeFormatImg from "../assets/images/service_large_format_1794673000530.jpg";
 import serviceMerchImg from "../assets/images/service_packaging_merch_1794673001916.jpg";
-import { BRAND_NAME } from "../types/photo";
+import {
+  PortfolioItemRecord,
+  ServiceRecord,
+  WebsiteSettings,
+} from "../types/cms";
+import { BRAND_NAME, OFFICIAL_SUPPORT_EMAIL } from "../types/photo";
+import { submitPublicContact, submitPublicQuote } from "../utils/adminApi";
 
 interface LandingSectionsProps {
   supportEmail: string;
   onOpenMailModal: (subject?: string, body?: string) => void;
   onLaunchStudioMode: (mode: "passport" | "xerox" | "converters" | "resume") => void;
+  cmsSettings?: WebsiteSettings;
+  cmsServices?: ServiceRecord[];
+  cmsPortfolio?: PortfolioItemRecord[];
 }
 
 interface PrintServiceItem {
@@ -51,6 +60,62 @@ interface PrintServiceItem {
   image: string;
   icon: React.ComponentType<{ className?: string }>;
   studioMode?: "passport" | "xerox" | "converters" | "resume";
+}
+
+function getServiceVisuals(id: string, name: string) {
+  const key = `${id} ${name}`.toLowerCase();
+  if (key.includes("business card") || key.includes("brochure") || key.includes("invitation")) {
+    return {
+      icon: key.includes("brochure") ? BookOpen : key.includes("invitation") ? Mail : CreditCard,
+      image: serviceCardsImg,
+    };
+  }
+  if (key.includes("banner") || key.includes("poster") || key.includes("large")) {
+    return {
+      icon: key.includes("poster") ? FileImage : key.includes("large") ? Printer : Flag,
+      image: serviceLargeFormatImg,
+    };
+  }
+  if (key.includes("flex") || key.includes("vinyl")) {
+    return {
+      icon: key.includes("flex") ? Maximize2 : Layers,
+      image: heroPrintImg,
+    };
+  }
+  if (key.includes("sticker") || key.includes("shirt") || key.includes("logo") || key.includes("id")) {
+    return {
+      icon: key.includes("sticker")
+        ? Sticker
+        : key.includes("shirt")
+        ? Shirt
+        : key.includes("logo")
+        ? Palette
+        : BadgeCheck,
+      image: serviceMerchImg,
+    };
+  }
+  if (key.includes("photo") || key.includes("passport")) {
+    return { icon: Camera, image: aboutAtelierImg };
+  }
+  if (key.includes("flyer") || key.includes("graphic")) {
+    return {
+      icon: key.includes("graphic") ? PenTool : FileText,
+      image: aboutAtelierImg,
+    };
+  }
+  return { icon: Printer, image: serviceLargeFormatImg };
+}
+
+function getPortfolioFallbackImage(category: string, index: number): string {
+  const c = category.toLowerCase();
+  if (c.includes("business") || c.includes("graphic")) return serviceCardsImg;
+  if (c.includes("poster")) return serviceLargeFormatImg;
+  if (c.includes("packag") || c.includes("custom")) return serviceMerchImg;
+  if (c.includes("banner")) return heroPrintImg;
+  if (c.includes("brand")) return aboutAtelierImg;
+  return [serviceCardsImg, serviceLargeFormatImg, serviceMerchImg, heroPrintImg][
+    index % 4
+  ];
 }
 
 const PRINTING_SERVICES: PrintServiceItem[] = [
@@ -311,18 +376,60 @@ export function LandingSections({
   supportEmail,
   onOpenMailModal,
   onLaunchStudioMode,
+  cmsSettings,
+  cmsServices,
+  cmsPortfolio,
 }: LandingSectionsProps) {
   const prefersReducedMotion = useReducedMotion();
 
+  const resolvedServices: PrintServiceItem[] = useMemo(() => {
+    if (!cmsServices || cmsServices.length === 0) return PRINTING_SERVICES;
+    return cmsServices
+      .filter((s) => s.is_published !== 0)
+      .map((s) => {
+        const fallback = getServiceVisuals(s.id, s.name);
+        return {
+          id: s.id,
+          name: s.name,
+          description: s.description,
+          image: s.image_url?.trim() || fallback.image,
+          icon: fallback.icon,
+          studioMode: s.studio_mode || undefined,
+        };
+      });
+  }, [cmsServices]);
+
+  const resolvedPortfolio = useMemo(() => {
+    if (!cmsPortfolio || cmsPortfolio.length === 0) return PORTFOLIO_WORKS;
+    return cmsPortfolio
+      .filter((p) => p.is_published !== 0)
+      .map((p, idx) => ({
+        id: p.id,
+        title: p.title,
+        category: p.category as Exclude<PortfolioCategory, "All">,
+        subtitle: p.subtitle,
+        image: p.image_url?.trim() || getPortfolioFallbackImage(p.category, idx),
+      }));
+  }, [cmsPortfolio]);
+
+  const portfolioCategories = useMemo(() => {
+    const extra = Array.from(
+      new Set(resolvedPortfolio.map((w) => w.category).filter(Boolean))
+    );
+    const merged = Array.from(
+      new Set(["All", ...PORTFOLIO_CATEGORIES.filter((c) => c !== "All"), ...extra])
+    );
+    return merged as string[];
+  }, [resolvedPortfolio]);
+
   // Portfolio category filter & lightbox
-  const [activePortfolioCat, setActivePortfolioCat] =
-    useState<PortfolioCategory>("All");
+  const [activePortfolioCat, setActivePortfolioCat] = useState<string>("All");
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
 
   const filteredPortfolio = useMemo(() => {
-    if (activePortfolioCat === "All") return PORTFOLIO_WORKS;
-    return PORTFOLIO_WORKS.filter((w) => w.category === activePortfolioCat);
-  }, [activePortfolioCat]);
+    if (activePortfolioCat === "All") return resolvedPortfolio;
+    return resolvedPortfolio.filter((w) => w.category === activePortfolioCat);
+  }, [activePortfolioCat, resolvedPortfolio]);
 
   useEffect(() => {
     if (lightboxIdx === null) return;
@@ -351,12 +458,16 @@ export function LandingSections({
   const [quoteMaterial, setQuoteMaterial] = useState("350gsm Matte Velvet Cardstock");
   const [quoteQuantity, setQuoteQuantity] = useState("100");
   const [quoteColorMode, setQuoteColorMode] = useState<"color" | "bw">("color");
-  const [quoteFile, setQuoteFile] = useState<{ name: string; sizeKB: number } | null>(
-    null
-  );
+  const [quoteFile, setQuoteFile] = useState<{
+    name: string;
+    sizeKB: number;
+    file: File;
+  } | null>(null);
   const [quoteNotes, setQuoteNotes] = useState("");
   const [quoteName, setQuoteName] = useState("");
   const [quoteEmail, setQuoteEmail] = useState("");
+  const [quotePhone, setQuotePhone] = useState("");
+  const [isSubmittingQuote, setIsSubmittingQuote] = useState(false);
   const [quoteStatus, setQuoteStatus] = useState<{
     type: "success" | "error";
     text: string;
@@ -368,8 +479,14 @@ export function LandingSections({
   // Contact Form State
   const [contactName, setContactName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactSubject, setContactSubject] = useState("");
   const [contactProject, setContactProject] = useState("");
-  const [contactStatus, setContactStatus] = useState<string | null>(null);
+  const [isSubmittingContact, setIsSubmittingContact] = useState(false);
+  const [contactStatus, setContactStatus] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   const handleSelectServiceForQuote = (serviceName: string) => {
     setQuoteService(serviceName);
@@ -380,9 +497,26 @@ export function LandingSections({
   const handleQuoteArtworkChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    const isImg = file.type.startsWith("image/");
+    const maxMb = isPdf
+      ? cmsSettings?.maxPdfUploadMb || 20
+      : isImg
+      ? cmsSettings?.maxImageUploadMb || 15
+      : cmsSettings?.maxCustomUploadMb || 25;
+    if (file.size > maxMb * 1024 * 1024) {
+      setQuoteStatus({
+        type: "error",
+        text: `File exceeds the ${maxMb} MB studio upload limit. Please compress or send via Mail Desk.`,
+      });
+      e.target.value = "";
+      return;
+    }
+    setQuoteStatus(null);
     setQuoteFile({
       name: file.name,
       sizeKB: Math.max(1, Math.round(file.size / 1024)),
+      file,
     });
   };
 
@@ -395,18 +529,19 @@ export function LandingSections({
       `Material: ${quoteMaterial}`,
       `Quantity: ${quoteQuantity}`,
       `Print Mode: ${quoteColorMode === "color" ? "Full Color (CMYK)" : "Black & White"}`,
-      `Artwork Attached Locally: ${
-        quoteFile ? `${quoteFile.name} (${quoteFile.sizeKB} KB)` : "Will attach via email"
+      `Artwork File: ${
+        quoteFile ? `${quoteFile.name} (${quoteFile.sizeKB} KB)` : "Optional / Via Email"
       }`,
       `Pricing Tier: Request a Quote`,
       quoteName.trim() ? `Customer Name: ${quoteName.trim()}` : "",
       quoteEmail.trim() ? `Customer Email: ${quoteEmail.trim()}` : "",
+      quotePhone.trim() ? `Phone: ${quotePhone.trim()}` : "",
       quoteNotes.trim() ? `Requirements:\n${quoteNotes.trim()}` : "",
     ]
       .filter(Boolean)
       .join("\n");
 
-  const handleQuoteSubmit = (e: React.FormEvent) => {
+  const handleQuoteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!quoteName.trim() || !quoteEmail.trim()) {
       setQuoteStatus({
@@ -415,29 +550,86 @@ export function LandingSections({
       });
       return;
     }
-    setQuoteStatus({
-      type: "success",
-      text: `Quotation summary prepared for ${quoteService}. Opening Mail Desk to send your specification directly to ${supportEmail}.`,
-    });
-    onOpenMailModal(
-      `Quote Request: ${quoteService} (${quoteQuantity})`,
-      buildQuoteDraftBody()
-    );
+
+    try {
+      setIsSubmittingQuote(true);
+      setQuoteStatus(null);
+      const fd = new FormData();
+      fd.set("customerName", quoteName.trim());
+      fd.set("customerEmail", quoteEmail.trim());
+      if (quotePhone.trim()) fd.set("phoneNumber", quotePhone.trim());
+      fd.set("serviceType", quoteService);
+      fd.set("paperSize", quoteSize);
+      fd.set("material", quoteMaterial);
+      fd.set("quantity", quoteQuantity || "1");
+      fd.set(
+        "colorMode",
+        quoteColorMode === "color" ? "Full Color (CMYK)" : "Black & White"
+      );
+      fd.set("description", quoteNotes.trim());
+      if (quoteFile?.file) {
+        fd.set("attachment", quoteFile.file);
+      }
+
+      const res = await submitPublicQuote(fd);
+      setQuoteStatus({
+        type: "success",
+        text: `Quotation request submitted (Ref #${res.quoteId.slice(0, 8)}). Our print team has received your specifications and will reply to ${quoteEmail.trim()}.`,
+      });
+      setQuoteNotes("");
+      setQuoteFile(null);
+    } catch (err) {
+      setQuoteStatus({
+        type: "error",
+        text:
+          err instanceof Error
+            ? `${err.message} You can also send directly via Mail Desk.`
+            : "Could not save quote request to backend. Please use Mail Desk.",
+      });
+    } finally {
+      setIsSubmittingQuote(false);
+    }
   };
 
-  const handleContactSubmit = (e: React.FormEvent) => {
+  const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!contactName.trim() || !contactEmail.trim() || !contactProject.trim()) {
-      setContactStatus("Please fill in your name, email, and project message.");
+      setContactStatus({
+        type: "error",
+        text: "Please fill in your name, email, and project message.",
+      });
       return;
     }
-    setContactStatus(
-      "Message ready—opening Mail Desk so you can send directly with your preferred email client."
-    );
-    onOpenMailModal(
-      `Print Project Inquiry from ${contactName.trim()}`,
-      `From: ${contactName.trim()}\nEmail: ${contactEmail.trim()}\n\nProject Details:\n${contactProject.trim()}`
-    );
+
+    try {
+      setIsSubmittingContact(true);
+      setContactStatus(null);
+      const res = await submitPublicContact({
+        customerName: contactName.trim(),
+        customerEmail: contactEmail.trim(),
+        phoneNumber: contactPhone.trim() || undefined,
+        subject:
+          contactSubject.trim() ||
+          `Print Project Inquiry from ${contactName.trim()}`,
+        message: contactProject.trim(),
+      });
+      setContactStatus({
+        type: "success",
+        text: `Message sent to Print Desk (Ref #${res.messageId.slice(0, 8)}). We will respond to ${contactEmail.trim()}.`,
+      });
+      setContactProject("");
+      setContactSubject("");
+    } catch (err) {
+      setContactStatus({
+        type: "error",
+        text:
+          err instanceof Error
+            ? err.message
+            : "Could not send message. Please use Open Mail Desk.",
+      });
+    } finally {
+      setIsSubmittingContact(false);
+    }
   };
 
   return (
@@ -463,7 +655,7 @@ export function LandingSections({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {PRINTING_SERVICES.map((srv, idx) => {
+          {resolvedServices.map((srv, idx) => {
             const Icon = srv.icon;
             return (
               <motion.article
@@ -547,7 +739,7 @@ export function LandingSections({
           </div>
 
           <div className="flex flex-wrap gap-1.5 p-1.5 bg-[#111827]/85 border border-[#00E5FF]/15 rounded-xl">
-            {PORTFOLIO_CATEGORIES.map((cat) => {
+            {portfolioCategories.map((cat) => {
               const active = activePortfolioCat === cat;
               return (
                 <button
@@ -736,7 +928,7 @@ export function LandingSections({
             />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-5 relative">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 relative">
             {WORKFLOW_STEPS.map((item, idx) => {
               const Icon = item.icon;
               return (
@@ -802,12 +994,12 @@ export function LandingSections({
                   onChange={(e) => setQuoteService(e.target.value)}
                   className="w-full bg-[#080B12] border border-[#00E5FF]/25 rounded-xl px-3.5 py-2.5 text-sm text-[#F5F7FA] focus:outline-none focus:ring-2 focus:ring-[#00E5FF]"
                 >
-                  {PRINTING_SERVICES.map((s) => (
+                  {resolvedServices.map((s) => (
                     <option key={s.id} value={s.name}>
                       {s.name}
                     </option>
                   ))}
-                  {!PRINTING_SERVICES.some((s) => s.name === quoteService) && (
+                  {!resolvedServices.some((s) => s.name === quoteService) && (
                     <option value={quoteService}>{quoteService}</option>
                   )}
                 </select>
@@ -927,18 +1119,31 @@ export function LandingSections({
 
               <div>
                 <span className="block text-xs font-semibold text-[#E2E8F0] mb-1.5">
-                  Artwork File (PDF, PNG, JPG, SVG)
+                  Artwork / Data File (
+                  {cmsSettings?.allowAnyUpload !== false
+                    ? "PDF, XML, Images, SVG, Docs"
+                    : (cmsSettings?.allowedUploadExtensions || ["pdf", "png", "jpg"])
+                        .slice(0, 6)
+                        .map((e) => e.toUpperCase())
+                        .join(", ")}
+                  )
                 </span>
                 <label className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-[#080B12] border border-dashed border-[#00E5FF]/35 hover:border-[#00E5FF] rounded-xl cursor-pointer transition-colors">
                   <span className="text-xs text-[#94A3B8] truncate">
                     {quoteFile
                       ? `${quoteFile.name} (${quoteFile.sizeKB} KB)`
-                      : "Click to attach artwork file..."}
+                      : "Click to attach artwork or document..."}
                   </span>
                   <Upload className="w-4 h-4 text-[#00E5FF] shrink-0" />
                   <input
                     type="file"
-                    accept="image/*,.pdf,.svg"
+                    accept={
+                      cmsSettings?.allowAnyUpload !== false
+                        ? undefined
+                        : cmsSettings?.allowedUploadExtensions?.length
+                        ? cmsSettings.allowedUploadExtensions.map((ext) => `.${ext}`).join(",")
+                        : "image/*,.pdf,.svg,.xml"
+                    }
                     onChange={handleQuoteArtworkChange}
                     className="hidden"
                   />
@@ -946,7 +1151,7 @@ export function LandingSections({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label
                   htmlFor="quote-name"
@@ -982,6 +1187,23 @@ export function LandingSections({
                   className="w-full bg-[#080B12] border border-[#00E5FF]/25 rounded-xl px-3.5 py-2.5 text-sm text-[#F5F7FA] placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#00E5FF]"
                 />
               </div>
+
+              <div>
+                <label
+                  htmlFor="quote-phone"
+                  className="block text-xs font-semibold text-[#E2E8F0] mb-1.5"
+                >
+                  Phone / WhatsApp (Optional)
+                </label>
+                <input
+                  id="quote-phone"
+                  type="tel"
+                  value={quotePhone}
+                  onChange={(e) => setQuotePhone(e.target.value)}
+                  placeholder="Optional contact number"
+                  className="w-full bg-[#080B12] border border-[#00E5FF]/25 rounded-xl px-3.5 py-2.5 text-sm text-[#F5F7FA] placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#00E5FF]"
+                />
+              </div>
             </div>
 
             <div>
@@ -1014,13 +1236,32 @@ export function LandingSections({
               </div>
             )}
 
-            <button
-              type="submit"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12] font-bold text-sm px-7 py-3 rounded-xl shadow-[0_0_24px_rgba(0,229,255,0.28)] hover:brightness-110 transition-all cursor-pointer"
-            >
-              <Send className="w-4 h-4" />
-              <span>Request Print Quotation</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="submit"
+                disabled={isSubmittingQuote}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12] font-bold text-sm px-7 py-3 rounded-xl shadow-[0_0_24px_rgba(0,229,255,0.28)] hover:brightness-110 disabled:opacity-50 transition-all cursor-pointer"
+              >
+                <Send className="w-4 h-4" />
+                <span>
+                  {isSubmittingQuote ? "Submitting Quote..." : "Submit Quote Request"}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  onOpenMailModal(
+                    `Quote Request: ${quoteService} (${quoteQuantity})`,
+                    buildQuoteDraftBody()
+                  )
+                }
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[#080B12] border border-[#00E5FF]/25 hover:border-[#00E5FF]/60 text-[#E2E8F0] font-semibold text-xs px-4 py-3 rounded-xl transition-colors cursor-pointer"
+              >
+                <Mail className="w-3.5 h-3.5 text-[#00E5FF]" />
+                <span>Also Send via Mail Desk</span>
+              </button>
+            </div>
           </form>
 
           {/* Quotation Summary Panel */}
@@ -1081,7 +1322,14 @@ export function LandingSections({
             <p className="text-[11px] text-[#94A3B8] leading-relaxed">
               Every print run is reviewed for bleed, margins, and stock
               availability before confirming turnaround and pricing via{" "}
-              <span className="text-[#F5F7FA] font-mono-nums">{supportEmail}</span>.
+              <span className="text-[#F5F7FA] font-mono-nums break-all">
+                {supportEmail}
+              </span>{" "}
+              or{" "}
+              <span className="text-[#00E5FF] font-mono-nums break-all">
+                {OFFICIAL_SUPPORT_EMAIL}
+              </span>
+              .
             </p>
           </aside>
         </div>
@@ -1092,7 +1340,7 @@ export function LandingSections({
         <div className="glass-card overflow-hidden grid grid-cols-1 lg:grid-cols-12 items-stretch">
           <div className="lg:col-span-6 relative min-h-[320px] bg-[#080B12]">
             <img
-              src={aboutAtelierImg}
+              src={cmsSettings?.aboutImageUrl?.trim() || aboutAtelierImg}
               alt="SUN-NOVA PRINT SERVICE color-calibrated graphic design and print studio"
               loading="lazy"
               referrerPolicy="no-referrer"
@@ -1107,21 +1355,19 @@ export function LandingSections({
           <div className="lg:col-span-6 p-7 sm:p-10 flex flex-col justify-center space-y-6">
             <div>
               <p className="text-xs font-mono-nums uppercase tracking-[0.2em] text-[#00E5FF] mb-2">
-                05 · About {BRAND_NAME}
+                {cmsSettings?.aboutEyebrow?.trim() || `05 · About ${BRAND_NAME}`}
               </p>
               <h2
                 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-[#F5F7FA]"
                 style={{ textWrap: "balance" }}
               >
-                Precision Meets Creativity.
+                {cmsSettings?.aboutHeadline?.trim() || "Precision Meets Creativity."}
               </h2>
             </div>
 
             <p className="text-sm sm:text-base text-[#94A3B8] leading-relaxed">
-              At {BRAND_NAME}, we transform creative ideas into high-quality
-              printed experiences. From professional business materials to
-              vibrant large-format prints, we combine creativity, precision, and
-              modern printing technology to bring every vision to life.
+              {cmsSettings?.aboutDescription?.trim() ||
+                `At ${BRAND_NAME}, we transform creative ideas into high-quality printed experiences. From professional business materials to vibrant large-format prints, we combine creativity, precision, and modern printing technology to bring every vision to life.`}
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
@@ -1263,16 +1509,59 @@ export function LandingSections({
                 stunning printed reality.
               </p>
 
-              <div className="p-4 rounded-xl bg-[#080B12]/75 border border-[#00E5FF]/20 space-y-2 text-xs">
-                <div className="flex items-center justify-between gap-2">
+              <div className="p-4 rounded-xl bg-[#080B12]/75 border border-[#00E5FF]/20 space-y-2.5 text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-[#94A3B8]">Print Desk Email:</span>
-                  <span className="font-mono-nums font-semibold text-[#00E5FF]">
+                  <a
+                    href={`mailto:${supportEmail}`}
+                    className="font-mono-nums font-semibold text-[#00E5FF] hover:underline break-all"
+                  >
                     {supportEmail}
-                  </span>
+                  </a>
                 </div>
-                <p className="text-[#94A3B8]">
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/10">
+                  <span className="text-[#94A3B8]">Support Mail:</span>
+                  <a
+                    href={`mailto:${OFFICIAL_SUPPORT_EMAIL}`}
+                    className="font-mono-nums font-semibold text-[#00E5FF] hover:underline break-all"
+                  >
+                    {OFFICIAL_SUPPORT_EMAIL}
+                  </a>
+                </div>
+                {cmsSettings?.contactPhone?.trim() && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/10">
+                    <span className="text-[#94A3B8]">Studio Phone:</span>
+                    <span className="font-mono-nums font-semibold text-[#F5F7FA]">
+                      {cmsSettings.contactPhone}
+                    </span>
+                  </div>
+                )}
+                {cmsSettings?.contactAddress?.trim() && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/10">
+                    <span className="text-[#94A3B8]">Studio Address:</span>
+                    <span className="text-right text-[#F5F7FA]">
+                      {cmsSettings.contactAddress}
+                    </span>
+                  </div>
+                )}
+                {cmsSettings?.socialLinks && cmsSettings.socialLinks.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-white/10">
+                    {cmsSettings.socialLinks.map((s) => (
+                      <a
+                        key={`${s.label}-${s.url}`}
+                        href={s.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-2.5 py-1 rounded-md bg-[#161D2B] border border-[#00E5FF]/20 text-[11px] font-semibold text-[#00E5FF] hover:border-[#00E5FF]"
+                      >
+                        {s.label}
+                      </a>
+                    ))}
+                  </div>
+                )}
+                <p className="text-[#94A3B8] pt-1">
                   All project specifications, artwork files, and quotations are
-                  coordinated strictly via official studio Email.
+                  coordinated strictly via official studio Email or Print Desk.
                 </p>
               </div>
 
@@ -1340,6 +1629,41 @@ export function LandingSections({
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label
+                    htmlFor="contact-phone"
+                    className="block text-xs font-semibold text-[#94A3B8] mb-1"
+                  >
+                    Phone (Optional)
+                  </label>
+                  <input
+                    id="contact-phone"
+                    type="tel"
+                    value={contactPhone}
+                    onChange={(e) => setContactPhone(e.target.value)}
+                    placeholder="Optional contact number"
+                    className="w-full bg-[#111827] border border-[#00E5FF]/20 rounded-xl px-3.5 py-2.5 text-sm text-[#F5F7FA] placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#00E5FF]"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="contact-subject"
+                    className="block text-xs font-semibold text-[#94A3B8] mb-1"
+                  >
+                    Subject
+                  </label>
+                  <input
+                    id="contact-subject"
+                    type="text"
+                    value={contactSubject}
+                    onChange={(e) => setContactSubject(e.target.value)}
+                    placeholder="Print Project Inquiry"
+                    className="w-full bg-[#111827] border border-[#00E5FF]/20 rounded-xl px-3.5 py-2.5 text-sm text-[#F5F7FA] placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#00E5FF]"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label
                   htmlFor="contact-project"
@@ -1359,15 +1683,29 @@ export function LandingSections({
               </div>
 
               {contactStatus && (
-                <p className="text-xs text-[#00E5FF]">{contactStatus}</p>
+                <p
+                  role="status"
+                  className={`text-xs rounded-xl px-3.5 py-2.5 border ${
+                    contactStatus.type === "success"
+                      ? "bg-emerald-950/60 border-emerald-500/40 text-emerald-200"
+                      : "bg-rose-950/60 border-rose-500/40 text-rose-200"
+                  }`}
+                >
+                  {contactStatus.text}
+                </p>
               )}
 
               <button
                 type="submit"
-                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12] font-bold text-sm py-3 rounded-xl hover:brightness-110 transition-all cursor-pointer"
+                disabled={isSubmittingContact}
+                className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12] font-bold text-sm py-3 rounded-xl hover:brightness-110 disabled:opacity-50 transition-all cursor-pointer"
               >
                 <Send className="w-4 h-4" />
-                <span>Send Message via Mail Desk</span>
+                <span>
+                  {isSubmittingContact
+                    ? "Sending to Print Desk..."
+                    : "Send Direct Message"}
+                </span>
               </button>
             </form>
           </div>

@@ -769,9 +769,9 @@ export function ResumeMakerStudio() {
       {/* Main Two-Column Resume Workbench */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left 5 Columns: Structured Resume Editor */}
-        <div className="lg:col-span-5 bg-white rounded-xl border border-slate-200 p-4 sm:p-5 space-y-5">
+        <div className="lg:col-span-5 min-w-0 bg-white rounded-xl border border-slate-200 p-4 sm:p-5 space-y-5">
           {/* Editor Sub-Tabs */}
-          <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-lg">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 p-1 bg-slate-100 rounded-lg">
             <button
               type="button"
               onClick={() => setEditorTab("content")}
@@ -866,7 +866,7 @@ export function ResumeMakerStudio() {
                     />
                   </label>
                 </div>
-                <div className="grid grid-cols-3 gap-1.5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                   {RESUME_ACCENT_PRESETS.map((c) => (
                     <button
                       key={c.hex}
@@ -889,7 +889,7 @@ export function ResumeMakerStudio() {
               </div>
 
               {/* Typography & Paper */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                     03. Font Style
@@ -1039,7 +1039,7 @@ export function ResumeMakerStudio() {
                   <span className="block text-[11px] font-medium text-slate-500 mb-1.5">
                     Photo Shape Style ({RESUME_PHOTO_SHAPES.length} shapes):
                   </span>
-                  <div className="grid grid-cols-4 gap-1.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                     {RESUME_PHOTO_SHAPES.map((shape) => {
                       const active = resume.photoShape === shape.id;
                       return (
@@ -1063,7 +1063,7 @@ export function ResumeMakerStudio() {
                 </div>
 
                 {/* Photo Size & Frame Border Style */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <div className="flex justify-between text-[11px] text-slate-600 mb-0.5">
                       <span>Photo Size</span>
@@ -1112,7 +1112,7 @@ export function ResumeMakerStudio() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100 rounded-lg">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 p-1 bg-slate-100 rounded-lg">
                   {(
                     ["solid", "double", "dashed", "none"] as ResumePhotoBorderStyle[]
                   ).map((bStyle) => (
@@ -1507,7 +1507,7 @@ export function ResumeMakerStudio() {
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <input
                         type="text"
                         placeholder="Institution / University"
@@ -1821,7 +1821,7 @@ export function ResumeMakerStudio() {
         </div>
 
         {/* Right 7 Columns: Live Multi-Page Preview & Export Controls */}
-        <div className="lg:col-span-7 bg-white rounded-xl border border-slate-200 p-4 sm:p-6 space-y-4">
+        <div className="lg:col-span-7 min-w-0 bg-white rounded-xl border border-slate-200 p-4 sm:p-6 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
             <div className="flex items-center gap-2 text-xs text-slate-600 font-mono-nums">
               <FileText className="w-4 h-4 text-slate-700" />

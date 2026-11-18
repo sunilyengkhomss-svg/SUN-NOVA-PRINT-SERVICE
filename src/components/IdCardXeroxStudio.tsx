@@ -877,7 +877,7 @@ export function IdCardXeroxStudio({ onMailQuery }: IdCardXeroxStudioProps) {
 
         {/* 03. Paper, Sets & Front/Back Up-Down Layout */}
         <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label
                 htmlFor="id-paper-select"
@@ -956,7 +956,7 @@ export function IdCardXeroxStudio({ onMailQuery }: IdCardXeroxStudioProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div>
               <span className="block text-[11px] text-slate-600 mb-1">
                 Position on Sheet
@@ -1067,7 +1067,7 @@ export function IdCardXeroxStudio({ onMailQuery }: IdCardXeroxStudioProps) {
             ))}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <div className="flex justify-between text-[11px] text-slate-600 mb-0.5">
                 <span>Thickness</span>

@@ -224,13 +224,15 @@ export interface RenderPhotoOptions {
   outW: number;
   outH: number;
   bgColor: string;
+  bgImageUrl?: string | null;
   rotation?: number;
   brightness?: number;
   contrast?: number;
   imageFilter?: ImageFilterKey;
   nameText?: string;
   dateText?: string;
-  dressId?: DressStyleId;
+  dressId?: DressStyleId | string;
+  dressCustomUrl?: string | null;
   dressScale?: number;
   dressOffsetX?: number;
   dressOffsetY?: number;
@@ -250,6 +252,7 @@ export async function renderSinglePhotoCanvas(
     outW,
     outH,
     bgColor,
+    bgImageUrl = null,
     rotation = 0,
     brightness = 100,
     contrast = 100,
@@ -257,6 +260,7 @@ export async function renderSinglePhotoCanvas(
     nameText = "",
     dateText = "",
     dressId = "none",
+    dressCustomUrl = null,
     dressScale = 1,
     dressOffsetX = 0,
     dressOffsetY = 0,
@@ -294,9 +298,33 @@ export async function renderSinglePhotoCanvas(
   outCanvas.height = outH;
   const ctx = outCanvas.getContext("2d")!;
 
-  // Background fill (reveals cleanly behind transparent PNG cutouts)
+  // Background fill (solid color fallback + optional custom backdrop image)
   ctx.fillStyle = bgColor;
   ctx.fillRect(0, 0, outW, outH);
+
+  if (bgImageUrl) {
+    try {
+      const bgImg = await loadHtmlImage(bgImageUrl);
+      const iw = bgImg.naturalWidth || bgImg.width;
+      const ih = bgImg.naturalHeight || bgImg.height;
+      const targetRatio = outW / outH;
+      const imgRatio = iw / ih;
+      let sx = 0;
+      let sy = 0;
+      let sw = iw;
+      let sh = ih;
+      if (imgRatio > targetRatio) {
+        sw = ih * targetRatio;
+        sx = (iw - sw) / 2;
+      } else {
+        sh = iw / targetRatio;
+        sy = (ih - sh) / 2;
+      }
+      ctx.drawImage(bgImg, sx, sy, sw, sh, 0, 0, outW, outH);
+    } catch {
+      // Keep solid bgColor if backdrop failed to load
+    }
+  }
 
   // Draw cropped portion scaled cleanly to outW x outH
   ctx.drawImage(
@@ -311,10 +339,11 @@ export async function renderSinglePhotoCanvas(
     outH
   );
 
-  // Step 2b: Optional Formal Passport Dress Overlay
-  const dressDataUrl = buildDressDataUrl(dressId);
-  if (dressDataUrl) {
-    const dressImg = await loadHtmlImage(dressDataUrl);
+  // Step 2b: Optional Formal Passport Dress Overlay (built-in SVG or R2 PNG/WEBP)
+  const resolvedDressUrl =
+    dressCustomUrl || buildDressDataUrl(dressId as DressStyleId);
+  if (resolvedDressUrl) {
+    const dressImg = await loadHtmlImage(resolvedDressUrl);
     const dw = outW * dressScale;
     const dh = outH * dressScale;
     const dx = (outW - dw) / 2 + (dressOffsetX / 100) * outW;

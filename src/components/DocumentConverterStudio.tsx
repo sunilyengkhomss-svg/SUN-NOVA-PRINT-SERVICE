@@ -8,6 +8,7 @@ import {
   Check,
   Copy,
   Download,
+  FileCode2,
   FileImage,
   FileText,
   Image as ImageIcon,
@@ -24,6 +25,17 @@ import {
   setJpegPpi,
   triggerBlobDownload,
 } from "../utils/imageProcessing";
+import {
+  SAMPLE_XML_DOC,
+  csvToXmlString,
+  formatXmlPretty,
+  jsonToXmlString,
+  minifyXml,
+  validateXmlInput,
+  xmlToCsvString,
+  xmlToJsonString,
+  xmlToPlainText,
+} from "../utils/xmlConverter";
 import { CameraCaptureModal } from "./CameraCaptureModal";
 
 let cachedPdfWorkerUrl: string | null = null;
@@ -35,7 +47,21 @@ function getPdfWorkerSrc(): string {
   return cachedPdfWorkerUrl;
 }
 
-type ConverterTab = "photo_to_pdf" | "pdf_to_photo" | "text_to_image" | "image_to_text";
+type ConverterTab =
+  | "photo_to_pdf"
+  | "pdf_to_photo"
+  | "text_to_image"
+  | "image_to_text"
+  | "xml_converter";
+
+type XmlConversionMode =
+  | "xml_to_json"
+  | "xml_to_csv"
+  | "xml_pretty"
+  | "xml_minify"
+  | "xml_to_text"
+  | "json_to_xml"
+  | "csv_to_xml";
 
 interface PdfQueuePhoto {
   id: string;
@@ -128,8 +154,120 @@ export function DocumentConverterStudio() {
   const [ocrError, setOcrError] = useState<string | null>(null);
   const [ocrCopied, setOcrCopied] = useState(false);
 
+  // 5. XML File Converter State
+  const [xmlInputText, setXmlInputText] = useState<string>(SAMPLE_XML_DOC);
+  const [xmlSourceName, setXmlSourceName] = useState<string>("print-orders.xml");
+  const [xmlMode, setXmlMode] = useState<XmlConversionMode>("xml_to_json");
+  const [xmlIndent, setXmlIndent] = useState<"2" | "4" | "tab">("2");
+  const [xmlRootTag, setXmlRootTag] = useState<string>("dataset");
+  const [xmlRowTag, setXmlRowTag] = useState<string>("record");
+  const [xmlCopied, setXmlCopied] = useState(false);
+  const [xmlStatus, setXmlStatus] = useState<string | null>(null);
+
   // Shared Camera Modal target
   const [cameraFor, setCameraFor] = useState<"pdf" | "ocr" | null>(null);
+
+  const xmlValidation = React.useMemo(() => {
+    if (xmlMode === "json_to_xml" || xmlMode === "csv_to_xml") return null;
+    return validateXmlInput(xmlInputText);
+  }, [xmlInputText, xmlMode]);
+
+  const xmlConverted = React.useMemo(() => {
+    const indentUnit = xmlIndent === "tab" ? "\t" : xmlIndent === "4" ? "    " : "  ";
+    const indentSpaces = xmlIndent === "4" ? 4 : 2;
+    try {
+      let output = "";
+      let ext = "json";
+      let mime = "application/json;charset=utf-8";
+      switch (xmlMode) {
+        case "xml_to_json":
+          output = xmlToJsonString(xmlInputText, indentSpaces);
+          ext = "json";
+          mime = "application/json;charset=utf-8";
+          break;
+        case "xml_to_csv":
+          output = xmlToCsvString(xmlInputText);
+          ext = "csv";
+          mime = "text/csv;charset=utf-8";
+          break;
+        case "xml_pretty":
+          output = formatXmlPretty(xmlInputText, indentUnit);
+          ext = "xml";
+          mime = "application/xml;charset=utf-8";
+          break;
+        case "xml_minify":
+          output = minifyXml(xmlInputText);
+          ext = "xml";
+          mime = "application/xml;charset=utf-8";
+          break;
+        case "xml_to_text":
+          output = xmlToPlainText(xmlInputText);
+          ext = "txt";
+          mime = "text/plain;charset=utf-8";
+          break;
+        case "json_to_xml":
+          output = jsonToXmlString(xmlInputText, xmlRootTag || "dataset", indentUnit);
+          ext = "xml";
+          mime = "application/xml;charset=utf-8";
+          break;
+        case "csv_to_xml":
+          output = csvToXmlString(
+            xmlInputText,
+            xmlRootTag || "dataset",
+            xmlRowTag || "record",
+            indentUnit
+          );
+          ext = "xml";
+          mime = "application/xml;charset=utf-8";
+          break;
+      }
+      return { output, ext, mime, error: null as string | null };
+    } catch (err) {
+      return {
+        output: "",
+        ext: xmlMode === "xml_to_json" ? "json" : xmlMode === "xml_to_csv" ? "csv" : "xml",
+        mime: "text/plain;charset=utf-8",
+        error: err instanceof Error ? err.message : "Conversion failed.",
+      };
+    }
+  }, [xmlInputText, xmlMode, xmlIndent, xmlRootTag, xmlRowTag]);
+
+  const handleXmlFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const content = await file.text();
+    setXmlInputText(content);
+    setXmlSourceName(file.name);
+    setXmlStatus(null);
+    const lower = file.name.toLowerCase();
+    if (lower.endsWith(".json")) {
+      setXmlMode("json_to_xml");
+    } else if (lower.endsWith(".csv")) {
+      setXmlMode("csv_to_xml");
+    } else if (xmlMode === "json_to_xml" || xmlMode === "csv_to_xml") {
+      setXmlMode("xml_to_json");
+    }
+  };
+
+  const handleCopyXmlOutput = async () => {
+    if (!xmlConverted.output) return;
+    await navigator.clipboard.writeText(xmlConverted.output);
+    setXmlCopied(true);
+    setTimeout(() => setXmlCopied(false), 2000);
+  };
+
+  const handleDownloadXmlOutput = () => {
+    if (!xmlConverted.output) return;
+    const base =
+      xmlSourceName
+        .replace(/\.[^.]+$/, "")
+        .replace(/[^a-zA-Z0-9_-]+/g, "-") || "sun-nova-converted";
+    const filename = `${base}.${xmlConverted.ext}`;
+    const blob = new Blob([xmlConverted.output], { type: xmlConverted.mime });
+    triggerBlobDownload(blob, filename);
+    setXmlStatus(`Downloaded ${filename} (${Math.max(1, Math.round(blob.size / 1024))} KB)`);
+  };
 
   // --- PHOTO TO PDF HANDLERS ---
   const handleAddPdfPhotos = (files: FileList | null) => {
@@ -588,7 +726,7 @@ export function DocumentConverterStudio() {
 
   return (
     <section className="space-y-6">
-      {/* Sub-navigation for all 4 converters */}
+      {/* Sub-navigation for all 5 converters */}
       <div className="bg-white rounded-xl border border-slate-200 p-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-lg">
           {(
@@ -597,6 +735,7 @@ export function DocumentConverterStudio() {
               { id: "pdf_to_photo", label: "PDF → Photo", icon: FileImage },
               { id: "text_to_image", label: "Text → Image", icon: Type },
               { id: "image_to_text", label: "Image → Text (OCR)", icon: ScanText },
+              { id: "xml_converter", label: "XML File Converter", icon: FileCode2 },
             ] as const
           ).map((tab) => {
             const Icon = tab.icon;
@@ -619,7 +758,7 @@ export function DocumentConverterStudio() {
         </div>
 
         <span className="text-xs text-slate-500 font-mono-nums">
-          All-in-One Document &amp; PDF Studio
+          PDF, XML, Text &amp; OCR Studio
         </span>
       </div>
 
@@ -1159,7 +1298,7 @@ export function DocumentConverterStudio() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Canvas Size
@@ -1228,7 +1367,7 @@ export function DocumentConverterStudio() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3 items-end">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
               <div>
                 <div className="flex justify-between text-xs text-slate-600 mb-1">
                   <span className="font-semibold text-slate-700">
@@ -1556,6 +1695,238 @@ export function DocumentConverterStudio() {
               >
                 <Type className="w-3.5 h-3.5" />
                 <span>Convert to Image</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: XML FILE CONVERTER */}
+      {activeTab === "xml_converter" && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div className="lg:col-span-6 bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
+              <div>
+                <h2 className="text-base font-bold text-slate-900">
+                  XML File Converter &amp; Validator
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Convert XML to JSON, CSV, Formatted XML, Minified XML, Text — or JSON/CSV to XML.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 px-3 py-1.5 rounded-lg cursor-pointer">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Upload File</span>
+                  <input
+                    type="file"
+                    accept=".xml,.json,.csv,.txt,application/xml,text/xml,application/json,text/csv"
+                    onChange={handleXmlFileUpload}
+                    className="hidden"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setXmlInputText(SAMPLE_XML_DOC);
+                    setXmlSourceName("print-orders.xml");
+                    if (xmlMode === "json_to_xml" || xmlMode === "csv_to_xml") {
+                      setXmlMode("xml_to_json");
+                    }
+                    setXmlStatus(null);
+                  }}
+                  className="text-xs font-semibold text-slate-800 bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded-lg cursor-pointer"
+                >
+                  Load Sample
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setXmlInputText("");
+                    setXmlStatus(null);
+                  }}
+                  className="text-xs text-slate-500 hover:text-red-600 px-2 py-1.5 cursor-pointer"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Conversion Mode
+                </label>
+                <select
+                  value={xmlMode}
+                  onChange={(e) => {
+                    setXmlMode(e.target.value as XmlConversionMode);
+                    setXmlStatus(null);
+                  }}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs font-medium text-slate-900 bg-white"
+                >
+                  <option value="xml_to_json">XML → JSON (.json)</option>
+                  <option value="xml_to_csv">XML → CSV / Excel (.csv)</option>
+                  <option value="xml_pretty">Format / Pretty XML (.xml)</option>
+                  <option value="xml_minify">Minify XML (.xml)</option>
+                  <option value="xml_to_text">XML → Plain Text Report (.txt)</option>
+                  <option value="json_to_xml">JSON → XML (.xml)</option>
+                  <option value="csv_to_xml">CSV → XML (.xml)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Indentation / Output Base Name
+                </label>
+                <div className="flex gap-2">
+                  <select
+                    aria-label="Indentation"
+                    value={xmlIndent}
+                    onChange={(e) => setXmlIndent(e.target.value as "2" | "4" | "tab")}
+                    className="border border-slate-300 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-900 bg-white"
+                  >
+                    <option value="2">2 Spaces</option>
+                    <option value="4">4 Spaces</option>
+                    <option value="tab">Tab</option>
+                  </select>
+                  <input
+                    type="text"
+                    value={xmlSourceName}
+                    onChange={(e) => setXmlSourceName(e.target.value)}
+                    placeholder="output-name"
+                    className="flex-1 min-w-0 border border-slate-300 rounded-lg px-2.5 py-2 text-xs text-slate-900 font-mono-nums"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {(xmlMode === "json_to_xml" || xmlMode === "csv_to_xml") && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                    Root XML Element Tag
+                  </label>
+                  <input
+                    type="text"
+                    value={xmlRootTag}
+                    onChange={(e) => setXmlRootTag(e.target.value)}
+                    placeholder="dataset"
+                    className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-mono-nums text-slate-900"
+                  />
+                </div>
+                {xmlMode === "csv_to_xml" && (
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Row XML Element Tag
+                    </label>
+                    <input
+                      type="text"
+                      value={xmlRowTag}
+                      onChange={(e) => setXmlRowTag(e.target.value)}
+                      placeholder="record"
+                      className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-mono-nums text-slate-900"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div>
+              <div className="flex items-center justify-between text-xs mb-1">
+                <span className="font-semibold text-slate-700">
+                  Source Input ({xmlMode === "json_to_xml" ? "JSON" : xmlMode === "csv_to_xml" ? "CSV" : "XML"})
+                </span>
+                <span className="font-mono-nums text-slate-500">
+                  {xmlValidation
+                    ? xmlValidation.valid
+                      ? `Valid <${xmlValidation.rootTag}> · ${xmlValidation.elementCount} nodes`
+                      : "XML Syntax Notice"
+                    : `${xmlInputText.split("\n").length} lines`}
+                </span>
+              </div>
+              <textarea
+                rows={13}
+                value={xmlInputText}
+                onChange={(e) => setXmlInputText(e.target.value)}
+                spellCheck={false}
+                placeholder="Paste XML, JSON, or CSV content here, or click Upload File above..."
+                className="w-full font-mono-nums border border-slate-300 rounded-lg px-3 py-2.5 text-xs leading-relaxed text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              />
+            </div>
+          </div>
+
+          <div className="lg:col-span-6 bg-white rounded-xl border border-slate-200 p-5 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
+              <span className="text-sm font-bold text-slate-900">
+                Converted Output (.{xmlConverted.ext.toUpperCase()})
+              </span>
+              <span className="text-xs font-mono-nums text-slate-500">
+                {xmlConverted.output
+                  ? `${xmlConverted.output.split("\n").length} lines · ${xmlConverted.output.length} chars`
+                  : "Waiting for valid input"}
+              </span>
+            </div>
+
+            {xmlConverted.error && (
+              <div className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                {xmlConverted.error}
+              </div>
+            )}
+
+            <textarea
+              rows={15}
+              readOnly
+              value={xmlConverted.output}
+              placeholder="Converted output will appear here live..."
+              className="w-full font-mono-nums border border-slate-300 rounded-lg px-3 py-2.5 text-xs leading-relaxed text-slate-900 bg-slate-50"
+            />
+
+            {xmlStatus && (
+              <div className="text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 font-mono-nums">
+                {xmlStatus}
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  disabled={!xmlConverted.output}
+                  onClick={handleCopyXmlOutput}
+                  className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-semibold px-3.5 py-2 rounded-lg cursor-pointer"
+                >
+                  {xmlCopied ? (
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5" />
+                  )}
+                  <span>{xmlCopied ? "Copied" : "Copy Output"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={!xmlConverted.output}
+                  onClick={handleDownloadXmlOutput}
+                  className="inline-flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-xs font-semibold px-4 py-2 rounded-lg cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download .{xmlConverted.ext.toUpperCase()}</span>
+                </button>
+              </div>
+
+              <button
+                type="button"
+                disabled={!xmlConverted.output}
+                onClick={() => {
+                  setTextTitle(xmlSourceName || "XML Export");
+                  setTextBody(xmlConverted.output.slice(0, 4000));
+                  setActiveTab("text_to_image");
+                }}
+                className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-900 text-xs font-semibold px-3.5 py-2 rounded-lg cursor-pointer"
+              >
+                <Type className="w-3.5 h-3.5" />
+                <span>Send to Text → Image</span>
               </button>
             </div>
           </div>

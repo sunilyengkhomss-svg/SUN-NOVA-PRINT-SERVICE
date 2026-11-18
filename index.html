@@ -24,6 +24,7 @@
         "@type": "WebApplication",
         "name": "SUN-NOVA PRINT SERVICE",
         "url": "https://sun-nova-print-service.pages.dev/",
+        "email": "sopport.sunnovaprintservice@gmail.com",
         "image": "https://sun-nova-print-service.pages.dev/hero_print_studio_1794673000273.jpg",
         "applicationCategory": "DesignApplication",
         "operatingSystem": "All",
@@ -62,9 +63,18 @@
           function (e) {
             var src = (e && (e.filename || (e.target && e.target.src))) || "";
             var stack = (e && e.error && e.error.stack) || "";
-            if (isExtensionSource(src) || isExtensionSource(stack)) {
+            var msg = (e && e.message) || "";
+            if (
+              isExtensionSource(src) ||
+              isExtensionSource(stack) ||
+              isExtensionSource(msg)
+            ) {
               if (typeof e.preventDefault === "function") e.preventDefault();
-              return;
+              if (typeof e.stopPropagation === "function") e.stopPropagation();
+              if (typeof e.stopImmediatePropagation === "function") {
+                e.stopImmediatePropagation();
+              }
+              return true;
             }
             if (window.__SUN_NOVA_MOUNTED__) return;
             if (e && e.target && e.target.tagName === "SCRIPT") {
@@ -82,20 +92,28 @@
           },
           true
         );
-        window.addEventListener("unhandledrejection", function (e) {
-          var reason = e && e.reason;
-          var msg = reason ? (reason.message || String(reason)) : "";
-          var stack = (reason && reason.stack) || "";
-          if (isExtensionSource(msg) || isExtensionSource(stack)) {
-            if (typeof e.preventDefault === "function") e.preventDefault();
-            return;
-          }
-          if (window.__SUN_NOVA_MOUNTED__) return;
-          if (msg) {
-            bootErr = "Startup error: " + msg;
-            showBootError(bootErr);
-          }
-        });
+        window.addEventListener(
+          "unhandledrejection",
+          function (e) {
+            var reason = e && e.reason;
+            var msg = reason ? (reason.message || String(reason)) : "";
+            var stack = (reason && reason.stack) || "";
+            if (isExtensionSource(msg) || isExtensionSource(stack)) {
+              if (typeof e.preventDefault === "function") e.preventDefault();
+              if (typeof e.stopPropagation === "function") e.stopPropagation();
+              if (typeof e.stopImmediatePropagation === "function") {
+                e.stopImmediatePropagation();
+              }
+              return;
+            }
+            if (window.__SUN_NOVA_MOUNTED__) return;
+            if (msg) {
+              bootErr = "Startup error: " + msg;
+              showBootError(bootErr);
+            }
+          },
+          true
+        );
         setTimeout(function () {
           if (!window.__SUN_NOVA_MOUNTED__ && !bootErr) {
             showBootError("Studio is still loading or blocked by browser cache/extension. Try Reload or open in a fresh Incognito window.");

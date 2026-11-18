@@ -1,7 +1,9 @@
 export const BRAND_NAME = "SUN-NOVA PRINT SERVICE";
 export const OFFICIAL_SITE_URL =
-  import.meta.env.VITE_SITE_URL || "https://sun-nova-print-service.pages.dev/";
-export const DEFAULT_SUPPORT_EMAIL = "sunilyengkhomss@gmail.com";
+  (typeof import.meta !== "undefined" && import.meta.env?.VITE_SITE_URL) ||
+  "https://sun-nova-print-service.pages.dev/";
+export const OFFICIAL_SUPPORT_EMAIL = "sopport.sunnovaprintservice@gmail.com";
+export const DEFAULT_SUPPORT_EMAIL = OFFICIAL_SUPPORT_EMAIL;
 export const PRINT_PPI = 300;
 
 export type PresetKey =

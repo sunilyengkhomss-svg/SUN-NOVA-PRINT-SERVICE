@@ -10,9 +10,10 @@ import React, {
 import Cropper, { Area } from "react-easy-crop";
 import {
   ArrowLeftRight,
-  Bot,
   Briefcase,
   Camera,
+  ChevronLeft,
+  ChevronRight,
   Download,
   Eye,
   FileText,
@@ -56,14 +57,24 @@ const ResumeMakerStudio = lazy(() =>
     default: m.ResumeMakerStudio,
   }))
 );
+const AdminPortal = lazy(() =>
+  import("./components/admin/AdminPortal").then((m) => ({
+    default: m.AdminPortal,
+  }))
+);
+import {
+  OutfitCategory,
+  PublicBootstrapPayload,
+} from "./types/cms";
+import { fetchPublicBootstrap } from "./utils/adminApi";
 import {
   BG_COLORS,
   BORDER_COLOR_PRESETS,
   BRAND_NAME,
   OFFICIAL_SITE_URL,
+  OFFICIAL_SUPPORT_EMAIL,
   DEFAULT_SUPPORT_EMAIL,
   DRESS_PRESETS,
-  DressCategory,
   DressStyleId,
   GAP_OPTIONS_MM,
   IMAGE_FILTER_PRESETS,
@@ -98,6 +109,7 @@ import { useUndoRedo } from "./utils/useUndoRedo";
 type StudioTab = "crop" | "sheet";
 type WorkspaceMode = "passport" | "xerox" | "converters" | "resume";
 type CountMode = "max" | "line1" | "line2" | "custom";
+type ExtendedDressCategory = "All" | OutfitCategory;
 
 interface PassportStudioState {
   originalSrc: string | null;
@@ -117,8 +129,8 @@ interface PassportStudioState {
   outlineStyle: OutlineStyle;
   outlineOffsetPx: number;
   applyBorderToSingle: boolean;
-  dressCategory: DressCategory;
-  dressId: DressStyleId;
+  dressCategory: ExtendedDressCategory;
+  dressId: string;
   dressScale: number;
   dressOffsetX: number;
   dressOffsetY: number;
@@ -131,6 +143,7 @@ interface PassportStudioState {
   imageFilter: ImageFilterKey;
   showHeadGuide: boolean;
   bgColor: string;
+  bgImageUrl: string | null;
   nameText: string;
   dateText: string;
   targetKB: number;
@@ -168,12 +181,59 @@ const INITIAL_PASSPORT_STUDIO_STATE: PassportStudioState = {
   imageFilter: "none",
   showHeadGuide: true,
   bgColor: "#FFFFFF",
+  bgImageUrl: null,
   nameText: "",
   dateText: "",
   targetKB: 0,
 };
 
 export default function App() {
+  // Admin Route vs Public Website
+  const [isAdminRoute, setIsAdminRoute] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.location.pathname.startsWith("/admin");
+  });
+
+  useEffect(() => {
+    const onPopState = () => {
+      setIsAdminRoute(window.location.pathname.startsWith("/admin"));
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  const navigateToAdmin = useCallback(() => {
+    if (window.location.pathname !== "/admin") {
+      window.history.pushState({}, "", "/admin");
+    }
+    setIsAdminRoute(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
+  const navigateToHome = useCallback(() => {
+    if (window.location.pathname !== "/") {
+      window.history.pushState({}, "", "/");
+    }
+    setIsAdminRoute(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
+  // Backend CMS Bootstrap Hydration
+  const [cmsData, setCmsData] = useState<PublicBootstrapPayload | null>(null);
+
+  const refreshPublicData = useCallback(async () => {
+    try {
+      const data = await fetchPublicBootstrap();
+      setCmsData(data);
+    } catch {
+      // Public UI keeps full built-in fallbacks if offline/static preview
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshPublicData();
+  }, [refreshPublicData]);
+
   // Workspace Mode (Passport Photos vs Aadhaar/PAN/ID Xerox)
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("passport");
 
@@ -221,6 +281,7 @@ export default function App() {
     imageFilter,
     showHeadGuide,
     bgColor,
+    bgImageUrl,
     nameText,
     dateText,
     targetKB,
@@ -265,9 +326,9 @@ export default function App() {
     patchStudio({ outlineOffsetPx: v }, "outline-offset");
   const setApplyBorderToSingle = (v: boolean) =>
     patchStudio({ applyBorderToSingle: v });
-  const setDressCategory = (v: DressCategory) =>
+  const setDressCategory = (v: ExtendedDressCategory) =>
     patchStudio({ dressCategory: v });
-  const setDressId = (v: DressStyleId) => patchStudio({ dressId: v });
+  const setDressId = (v: string) => patchStudio({ dressId: v });
   const setDressScale = (v: number) =>
     patchStudio({ dressScale: v }, "dress-scale");
   const setDressOffsetX = (v: number) =>
@@ -295,7 +356,10 @@ export default function App() {
       showHeadGuide:
         typeof updater === "function" ? updater(prev.showHeadGuide) : updater,
     }));
-  const setBgColor = (v: string) => patchStudio({ bgColor: v }, "bg-color");
+  const setBgColor = (v: string) =>
+    patchStudio({ bgColor: v, bgImageUrl: null }, "bg-color");
+  const setBgPreset = (hexColor: string, imageUrl: string | null) =>
+    patchStudio({ bgColor: hexColor, bgImageUrl: imageUrl }, "bg-color");
   const setNameText = (v: string) => patchStudio({ nameText: v }, "name-text");
   const setDateText = (v: string) => patchStudio({ dateText: v }, "date-text");
   const setTargetKB = (v: number) => patchStudio({ targetKB: v });
@@ -373,11 +437,27 @@ export default function App() {
   // Mail Desk Email (no phone numbers shown)
   const [supportEmail, setSupportEmail] = useState<string>(() => {
     try {
-      return localStorage.getItem("sunnova_support_email") || DEFAULT_SUPPORT_EMAIL;
+      const saved = localStorage.getItem("sunnova_support_email");
+      if (!saved || saved.toLowerCase().includes("sunilyengkhomss")) {
+        localStorage.setItem("sunnova_support_email", DEFAULT_SUPPORT_EMAIL);
+        return DEFAULT_SUPPORT_EMAIL;
+      }
+      return saved;
     } catch {
       return DEFAULT_SUPPORT_EMAIL;
     }
   });
+
+  useEffect(() => {
+    const cmsEmail = cmsData?.settings?.contactEmail?.trim();
+    if (
+      cmsEmail &&
+      !cmsEmail.toLowerCase().includes("sunilyengkhomss") &&
+      supportEmail === DEFAULT_SUPPORT_EMAIL
+    ) {
+      setSupportEmail(cmsEmail);
+    }
+  }, [cmsData?.settings?.contactEmail, supportEmail]);
 
   const handleSupportEmailChange = (email: string) => {
     setSupportEmail(email);
@@ -414,6 +494,59 @@ export default function App() {
     subject: string;
     body: string;
   }>({ isOpen: false, subject: "", body: "" });
+
+  // Side-by-Side Next-by-Next Control Panel Navigation
+  type ControlStepId = "size" | "bg" | "dress" | "name" | "export";
+  const STUDIO_CONTROL_STEPS: ReadonlyArray<{
+    id: ControlStepId;
+    label: string;
+  }> = [
+    { id: "size", label: "01–02 Size" },
+    { id: "bg", label: "03 BG & Cut" },
+    { id: "dress", label: "03b Outfit" },
+    { id: "name", label: "04–05 Info" },
+    { id: "export", label: "Export" },
+  ];
+  const rightPanelRef = useRef<HTMLDivElement | null>(null);
+  const [activeControlStep, setActiveControlStep] =
+    useState<ControlStepId>("size");
+
+  const scrollToControlStep = (stepId: ControlStepId) => {
+    setActiveControlStep(stepId);
+    const panel = rightPanelRef.current;
+    const target = document.getElementById(`studio-step-${stepId}`);
+    if (!target) return;
+    if (panel && panel.scrollHeight > panel.clientHeight + 8) {
+      const panelRect = panel.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const topOffset = panel.scrollTop + (targetRect.top - panelRect.top) - 56;
+      panel.scrollTo({ top: Math.max(0, topOffset), behavior: "smooth" });
+    } else {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
+  const stepControlIndex = STUDIO_CONTROL_STEPS.findIndex(
+    (s) => s.id === activeControlStep
+  );
+
+  const handleRightPanelScroll = () => {
+    const panel = rightPanelRef.current;
+    if (!panel) return;
+    const panelRect = panel.getBoundingClientRect();
+    let closest: ControlStepId = "size";
+    let smallestDist = Infinity;
+    for (const step of STUDIO_CONTROL_STEPS) {
+      const el = document.getElementById(`studio-step-${step.id}`);
+      if (!el) continue;
+      const dist = Math.abs(el.getBoundingClientRect().top - panelRect.top - 58);
+      if (dist < smallestDist) {
+        smallestDist = dist;
+        closest = step.id;
+      }
+    }
+    setActiveControlStep(closest);
+  };
 
   // Saved ZeroZeros Portal URL
   const [zeroZerosUrl, setZeroZerosUrl] = useState<string>(() => {
@@ -580,11 +713,30 @@ export default function App() {
     }
   };
 
-  const handleLoadSample = async () => {
+  const publishedSamplePortraits = useMemo(() => {
+    const list = (cmsData?.portraits || []).filter((p) => p.is_published !== 0);
+    if (list.length > 0) return list;
+    return [
+      {
+        id: "builtin-sample-1",
+        title: "Studio Sample Portrait",
+        media_id: null,
+        image_url: samplePortraitImg,
+        display_order: 1,
+        is_published: 1,
+        created_at: "",
+        updated_at: "",
+      },
+    ];
+  }, [cmsData?.portraits]);
+
+  const handleLoadSample = async (customUrl?: string) => {
+    const targetUrl =
+      customUrl || publishedSamplePortraits[0]?.image_url || samplePortraitImg;
     try {
       setErrorMessage(null);
       try {
-        const response = await fetch(samplePortraitImg);
+        const response = await fetch(targetUrl);
         if (response.ok) {
           const blob = await response.blob();
           loadImageBlob(blob);
@@ -593,7 +745,7 @@ export default function App() {
       } catch {
         // Fallback to image element conversion below
       }
-      const img = await loadHtmlImage(samplePortraitImg);
+      const img = await loadHtmlImage(targetUrl);
       const canvas = document.createElement("canvas");
       canvas.width = img.naturalWidth || img.width;
       canvas.height = img.naturalHeight || img.height;
@@ -615,7 +767,48 @@ export default function App() {
     setCroppedAreaPixels(croppedPixels);
   }, []);
 
-  const dressPreviewUrl = useMemo(() => buildDressDataUrl(dressId), [dressId]);
+  // Resolve active outfit list (CMS D1 published outfits merged with Original None)
+  const resolvedOutfits = useMemo(() => {
+    const cmsList = (cmsData?.outfits || []).filter((o) => o.is_published !== 0);
+    if (cmsList.length > 0) {
+      const items = cmsList.map((o) => ({
+        id: o.builtin_style_id || o.id,
+        label: o.name,
+        category: o.category as OutfitCategory,
+        customUrl: o.image_url || null,
+        builtinStyleId: o.builtin_style_id as DressStyleId | null,
+      }));
+      return [
+        {
+          id: "none",
+          label: "Original Outfit",
+          category: "None" as const,
+          customUrl: null,
+          builtinStyleId: "none" as DressStyleId,
+        },
+        ...items,
+      ];
+    }
+    return DRESS_PRESETS.map((d) => ({
+      id: d.id,
+      label: d.label,
+      category: d.category,
+      customUrl: null as string | null,
+      builtinStyleId: d.id as DressStyleId,
+    }));
+  }, [cmsData?.outfits]);
+
+  const activeOutfitCustomUrl = useMemo(() => {
+    if (dressId === "none") return null;
+    const found = resolvedOutfits.find((o) => o.id === dressId);
+    return found?.customUrl || null;
+  }, [dressId, resolvedOutfits]);
+
+  const dressPreviewUrl = useMemo(() => {
+    if (dressId === "none") return null;
+    if (activeOutfitCustomUrl) return activeOutfitCustomUrl;
+    return buildDressDataUrl(dressId as DressStyleId);
+  }, [dressId, activeOutfitCustomUrl]);
 
   useEffect(() => {
     const el = cropContainerRef.current;
@@ -666,6 +859,7 @@ export default function App() {
           outW: activeDims.printW,
           outH: activeDims.printH,
           bgColor,
+          bgImageUrl,
           rotation,
           brightness,
           contrast,
@@ -673,6 +867,7 @@ export default function App() {
           nameText,
           dateText,
           dressId,
+          dressCustomUrl: activeOutfitCustomUrl,
           dressScale,
           dressOffsetX,
           dressOffsetY,
@@ -697,6 +892,7 @@ export default function App() {
     activeDims.printW,
     activeDims.printH,
     bgColor,
+    bgImageUrl,
     rotation,
     brightness,
     contrast,
@@ -704,6 +900,7 @@ export default function App() {
     nameText,
     dateText,
     dressId,
+    activeOutfitCustomUrl,
     dressScale,
     dressOffsetX,
     dressOffsetY,
@@ -792,6 +989,7 @@ export default function App() {
         outW: activeDims.printW,
         outH: activeDims.printH,
         bgColor,
+        bgImageUrl,
         rotation,
         brightness,
         contrast,
@@ -799,6 +997,7 @@ export default function App() {
         nameText,
         dateText,
         dressId,
+        dressCustomUrl: activeOutfitCustomUrl,
         dressScale,
         dressOffsetX,
         dressOffsetY,
@@ -943,6 +1142,7 @@ export default function App() {
         outW: activeDims.w,
         outH: activeDims.h,
         bgColor,
+        bgImageUrl,
         rotation,
         brightness,
         contrast,
@@ -950,6 +1150,7 @@ export default function App() {
         nameText,
         dateText,
         dressId,
+        dressCustomUrl: activeOutfitCustomUrl,
         dressScale,
         dressOffsetX,
         dressOffsetY,
@@ -1007,6 +1208,7 @@ export default function App() {
           outW: activeDims.printW,
           outH: activeDims.printH,
           bgColor,
+          bgImageUrl,
           rotation,
           brightness,
           contrast,
@@ -1014,6 +1216,7 @@ export default function App() {
           nameText,
           dateText,
           dressId,
+          dressCustomUrl: activeOutfitCustomUrl,
           dressScale,
           dressOffsetX,
           dressOffsetY,
@@ -1110,11 +1313,30 @@ export default function App() {
       : sheetLayout.count;
 
   const filteredDresses = useMemo(() => {
-    if (dressCategory === "All") return DRESS_PRESETS;
-    return DRESS_PRESETS.filter(
+    if (dressCategory === "All") return resolvedOutfits;
+    return resolvedOutfits.filter(
       (d) => d.id === "none" || d.category === dressCategory
     );
-  }, [dressCategory]);
+  }, [dressCategory, resolvedOutfits]);
+
+  const resolvedBackgrounds = useMemo(() => {
+    const cmsBgs = (cmsData?.backgrounds || []).filter(
+      (b) => b.is_published !== 0
+    );
+    if (cmsBgs.length > 0) return cmsBgs;
+    return BG_COLORS.map((c, idx) => ({
+      id: `builtin-bg-${idx}`,
+      name: c.name,
+      preset_type: "color" as const,
+      hex_color: c.hex,
+      media_id: null,
+      image_url: null,
+      display_order: idx + 1,
+      is_published: 1,
+      created_at: "",
+      updated_at: "",
+    }));
+  }, [cmsData?.backgrounds]);
 
   const activeTheme = STUDIO_ACCENTS[studioAccent];
   const studioContextSummary = useMemo(
@@ -1135,13 +1357,41 @@ export default function App() {
     ]
   );
 
+  if (isAdminRoute) {
+    return (
+      <Suspense
+        fallback={
+          <div className="min-h-screen bg-[#080B12] text-[#F5F7FA] flex items-center justify-center p-6 text-sm text-[#94A3B8]">
+            Loading SUN-NOVA Admin Dashboard...
+          </div>
+        }
+      >
+        <AdminPortal
+          onExitAdmin={navigateToHome}
+          onPublicDataChanged={refreshPublicData}
+        />
+      </Suspense>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#080B12] text-[#F5F7FA] flex flex-col">
-      <Header onMailQuery={() => handleOpenMailQuery()} />
+      <Header
+        cmsSettings={cmsData?.settings}
+        onMailQuery={() => handleOpenMailQuery()}
+      />
 
       <main className="flex-1 w-full">
         {/* Cinematic Full-Screen Hero */}
         <HeroShowcase
+          cmsSettings={cmsData?.settings}
+          workspaceMode={workspaceMode}
+          onSelectWorkspaceMode={(mode) => {
+            setWorkspaceMode(mode);
+            document
+              .getElementById("studio-workbench")
+              ?.scrollIntoView({ behavior: "smooth" });
+          }}
           onJumpToStudio={() => {
             setWorkspaceMode("passport");
             document
@@ -1153,93 +1403,61 @@ export default function App() {
         {/* Interactive 300 PPI Print Studio Workbench */}
         <section
           id="studio-workbench"
-          className="studio-dark-shell max-w-7xl w-full mx-auto px-4 sm:px-6 pt-16 pb-6"
+          className="studio-dark-shell max-w-7xl w-full mx-auto px-3 sm:px-6 pt-8 sm:pt-10 pb-6"
         >
-          {/* Studio Intro & Workspace Mode Switcher */}
-          <div className="mb-8 flex flex-col lg:flex-row lg:items-end justify-between gap-6">
-            <div className="max-w-3xl">
-              <div className="flex flex-wrap items-center gap-2 text-xs text-[#00E5FF] font-mono-nums uppercase tracking-[0.14em] mb-2">
-                <span>300 PPI Interactive Studio</span>
-                <span aria-hidden="true">·</span>
-                <span>Student &amp; Officer Outfits</span>
-                <span aria-hidden="true">·</span>
-                <span>Aadhaar / PAN Xerox</span>
-                <span aria-hidden="true">·</span>
-                <span>Resume &amp; PDF Studio</span>
-              </div>
-              <h2
-                className="text-2xl sm:text-4xl font-extrabold tracking-tight text-[#F5F7FA]"
-                style={{ textWrap: "balance" }}
-              >
-                Passport Photo Maker &amp; Print Xerox Workbench
-              </h2>
-              <p className="text-[#94A3B8] text-sm sm:text-base mt-2 max-w-2xl">
-                Crop to 1.2 × 1.5 in or 35 × 45 mm at 300 PPI with Undo/Redo &amp;
-                Image Filters, click live camera photos, print Aadhaar &amp; PAN
-                Xerox sheets, convert PDFs/OCR, or build a Business &amp;
-                Teacher Resume.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto shrink-0">
-              <div className="flex flex-wrap items-center gap-1 p-1 bg-[#111827] border border-[#00E5FF]/20 rounded-xl">
-                <button
-                  type="button"
-                  onClick={() => setWorkspaceMode("passport")}
-                  className={`inline-flex items-center gap-2 px-3 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all whitespace-nowrap cursor-pointer ${
-                    workspaceMode === "passport"
-                      ? "bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12] shadow-sm"
-                      : "text-[#94A3B8] hover:text-[#F5F7FA]"
-                  }`}
-                >
-                  <ImageIcon className="w-4 h-4" />
-                  <span>Passport Photo Studio</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setWorkspaceMode("xerox")}
-                  className={`inline-flex items-center gap-2 px-3 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all whitespace-nowrap cursor-pointer ${
-                    workspaceMode === "xerox"
-                      ? "bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12] shadow-sm"
-                      : "text-[#94A3B8] hover:text-[#F5F7FA]"
-                  }`}
-                >
-                  <FileText className="w-4 h-4" />
-                  <span>Aadhaar / PAN / ID Xerox</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setWorkspaceMode("converters")}
-                  className={`inline-flex items-center gap-2 px-3 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all whitespace-nowrap cursor-pointer ${
-                    workspaceMode === "converters"
-                      ? "bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12] shadow-sm"
-                      : "text-[#94A3B8] hover:text-[#F5F7FA]"
-                  }`}
-                >
-                  <ArrowLeftRight className="w-4 h-4" />
-                  <span>PDF &amp; Text Converters</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setWorkspaceMode("resume")}
-                  className={`inline-flex items-center gap-2 px-3 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all whitespace-nowrap cursor-pointer ${
-                    workspaceMode === "resume"
-                      ? "bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12] shadow-sm"
-                      : "text-[#94A3B8] hover:text-[#F5F7FA]"
-                  }`}
-                >
-                  <Briefcase className="w-4 h-4" />
-                  <span>Resume Maker</span>
-                </button>
-              </div>
-
+          {/* Compact Centered Workspace Mode Switcher */}
+          <div className="mb-6 sm:mb-7 max-w-4xl mx-auto">
+            <p className="text-center text-[10px] sm:text-[11px] font-mono-nums tracking-[0.18em] text-[#00E5FF] uppercase mb-2.5">
+              {BRAND_NAME} · Precision Digital Print Studio
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 p-1.5 bg-[#111827] border border-[#00E5FF]/20 rounded-xl w-full">
               <button
                 type="button"
-                onClick={() => setIsAiOpen(true)}
-                className={`inline-flex items-center gap-1.5 font-bold text-xs sm:text-sm px-3.5 py-2.5 rounded-xl transition-all whitespace-nowrap cursor-pointer ${activeTheme.primaryBtn}`}
+                onClick={() => setWorkspaceMode("passport")}
+                className={`inline-flex items-center justify-center gap-1.5 px-2 md:px-2.5 lg:px-3 py-2 sm:py-2.5 text-[11px] sm:text-xs lg:text-sm font-semibold rounded-lg transition-all cursor-pointer min-h-[40px] sm:min-h-[42px] ${
+                  workspaceMode === "passport"
+                    ? "bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12] shadow-sm font-bold"
+                    : "text-[#94A3B8] hover:text-[#F5F7FA] hover:bg-white/5"
+                }`}
               >
-                <Bot className="w-4 h-4 shrink-0" />
-                <span>Ask AI Agent</span>
+                <ImageIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                <span className="truncate">Passport Photo Studio</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setWorkspaceMode("xerox")}
+                className={`inline-flex items-center justify-center gap-1.5 px-2 md:px-2.5 lg:px-3 py-2 sm:py-2.5 text-[11px] sm:text-xs lg:text-sm font-semibold rounded-lg transition-all cursor-pointer min-h-[40px] sm:min-h-[42px] ${
+                  workspaceMode === "xerox"
+                    ? "bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12] shadow-sm font-bold"
+                    : "text-[#94A3B8] hover:text-[#F5F7FA] hover:bg-white/5"
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                <span className="truncate">Aadhaar / PAN / ID Xerox</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setWorkspaceMode("converters")}
+                className={`inline-flex items-center justify-center gap-1.5 px-2 md:px-2.5 lg:px-3 py-2 sm:py-2.5 text-[11px] sm:text-xs lg:text-sm font-semibold rounded-lg transition-all cursor-pointer min-h-[40px] sm:min-h-[42px] ${
+                  workspaceMode === "converters"
+                    ? "bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12] shadow-sm font-bold"
+                    : "text-[#94A3B8] hover:text-[#F5F7FA] hover:bg-white/5"
+                }`}
+              >
+                <ArrowLeftRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                <span className="truncate">PDF, XML &amp; Text</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setWorkspaceMode("resume")}
+                className={`inline-flex items-center justify-center gap-1.5 px-2 md:px-2.5 lg:px-3 py-2 sm:py-2.5 text-[11px] sm:text-xs lg:text-sm font-semibold rounded-lg transition-all cursor-pointer min-h-[40px] sm:min-h-[42px] ${
+                  workspaceMode === "resume"
+                    ? "bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12] shadow-sm font-bold"
+                    : "text-[#94A3B8] hover:text-[#F5F7FA] hover:bg-white/5"
+                }`}
+              >
+                <Briefcase className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                <span className="truncate">Resume Maker</span>
               </button>
             </div>
           </div>
@@ -1260,7 +1478,7 @@ export default function App() {
             <Suspense
               fallback={
                 <div className="glass-card p-10 text-center text-sm text-[#94A3B8]">
-                  Loading PDF &amp; Text Converters...
+                  Loading PDF, XML &amp; Text Converters...
                 </div>
               }
             >
@@ -1278,22 +1496,22 @@ export default function App() {
             </Suspense>
           ) : (
           <>
-          {/* Main Two-Column Studio Workbench */}
+          {/* Main Two-Column Studio Workbench (Side-by-Side on Desktop, Split Top/Bottom on Mobile & Tablet) */}
           <div
             id="studio"
-            className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start"
+            className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-4 lg:gap-6 items-start"
           >
-            {/* Left 7 Columns: Interactive Cropper, Live Sheet Preview & Multi-Photo Queue */}
-            <div className="lg:col-span-7 space-y-6">
-              <div className="glass-card p-4 sm:p-6">
+            {/* Left / Top 7 Columns: Pinned Interactive Cropper, Live Sheet Preview & Multi-Photo Queue */}
+            <div className="lg:col-span-7 min-w-0 space-y-3 sm:space-y-4 lg:space-y-5 max-h-[43vh] sm:max-h-[46vh] lg:max-h-[calc(100vh-5.75rem)] overflow-y-auto studio-panel-scroll lg:sticky lg:top-20 pr-0.5 lg:pr-1">
+              <div className="glass-card p-3 sm:p-4 lg:p-5">
                 {/* Workspace Toolbar */}
-                <div className="flex flex-wrap items-center justify-between gap-3 pb-4 mb-4 border-b border-[#00E5FF]/15">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center gap-1 p-1 bg-[#080B12] border border-[#00E5FF]/20 rounded-xl">
+                <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-[#00E5FF]/15">
+                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                    <div className="grid grid-cols-2 sm:inline-flex items-center gap-1 p-1 bg-[#080B12] border border-[#00E5FF]/20 rounded-xl flex-1 sm:flex-initial">
                       <button
                         type="button"
                         onClick={() => setActiveTab("crop")}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                        className={`inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                           activeTab === "crop"
                             ? "bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12] shadow-sm"
                             : "text-[#94A3B8] hover:text-[#F5F7FA]"
@@ -1306,14 +1524,14 @@ export default function App() {
                         type="button"
                         id="sheet-layout"
                         onClick={() => setActiveTab("sheet")}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                        className={`inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                           activeTab === "sheet"
                             ? "bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12] shadow-sm"
                             : "text-[#94A3B8] hover:text-[#F5F7FA]"
                         }`}
                       >
                         <Grid className="w-3.5 h-3.5" />
-                        <span>
+                        <span className="truncate">
                           Sheet Preview ({effectiveSheetCount} on{" "}
                           {paper.shortLabel})
                         </span>
@@ -1358,7 +1576,7 @@ export default function App() {
                   </div>
 
                   {imageSrc && (
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
                       {activeTab === "crop" && (
                         <button
                           type="button"
@@ -1421,7 +1639,7 @@ export default function App() {
                       }}
                       onDragLeave={() => setIsDragActive(false)}
                       onDrop={handleDrop}
-                      className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl px-6 py-14 cursor-pointer transition-colors ${
+                      className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl px-4 sm:px-6 py-6 sm:py-8 lg:py-14 cursor-pointer transition-colors ${
                         isDragActive
                           ? "border-[#00E5FF] bg-[#00E5FF]/10"
                           : "border-[#00E5FF]/25 hover:border-[#00E5FF]/60 bg-[#080B12]/70"
@@ -1461,23 +1679,52 @@ export default function App() {
                         </button>
                         <button
                           type="button"
-                          onClick={handleLoadSample}
+                          onClick={() => handleLoadSample()}
                           className="inline-flex items-center gap-2 font-semibold text-[#F5F7FA] bg-[#161D2B] border border-[#00E5FF]/25 hover:border-[#00E5FF]/60 px-3 py-2 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                         >
                           <ImageIcon className="w-3.5 h-3.5 text-[#00E5FF]" />
-                          <span>Load Sample Portrait</span>
+                          <span>
+                            {publishedSamplePortraits[0]?.title
+                              ? `Sample: ${publishedSamplePortraits[0].title}`
+                              : "Load Sample Portrait"}
+                          </span>
                         </button>
                       </div>
                     </div>
+                    {publishedSamplePortraits.length > 1 && (
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                        <span className="text-[11px] text-[#94A3B8]">
+                          More studio samples:
+                        </span>
+                        {publishedSamplePortraits.map((sp) => (
+                          <button
+                            key={sp.id}
+                            type="button"
+                            onClick={() => handleLoadSample(sp.image_url)}
+                            className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-[#161D2B] border border-[#00E5FF]/20 hover:border-[#00E5FF] text-[11px] text-[#E2E8F0] cursor-pointer"
+                          >
+                            <img
+                              src={sp.image_url}
+                              alt={sp.title}
+                              className="w-4 h-4 rounded-sm object-cover"
+                            />
+                            <span>{sp.title}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div>
                     {/* Interactive Crop Frame */}
                     <div
                       ref={cropContainerRef}
-                      className="relative w-full h-[360px] sm:h-[410px] rounded-xl overflow-hidden border border-[#00E5FF]/25"
+                      className="relative w-full h-[230px] sm:h-[290px] lg:h-[370px] rounded-xl overflow-hidden border border-[#00E5FF]/25"
                       style={{
                         backgroundColor: bgColor,
+                        backgroundImage: bgImageUrl ? `url("${bgImageUrl}")` : undefined,
+                        backgroundSize: bgImageUrl ? "cover" : undefined,
+                        backgroundPosition: bgImageUrl ? "center" : undefined,
                       }}
                     >
                       <div
@@ -1502,7 +1749,9 @@ export default function App() {
                           onRotationChange={setRotation}
                           onCropComplete={onCropComplete}
                           style={{
-                            containerStyle: { backgroundColor: bgColor },
+                            containerStyle: {
+                              backgroundColor: bgImageUrl ? "transparent" : bgColor,
+                            },
                           }}
                         />
                       </div>
@@ -1789,8 +2038,8 @@ export default function App() {
               </div>
 
               {/* Multi-Photo Sheet Queue Panel */}
-              <div className="glass-card p-4 sm:p-6">
-                <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+              <div className="glass-card p-3 sm:p-4 lg:p-5">
+                <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 mb-2 sm:mb-3">
                   <div className="flex items-center gap-2">
                     <Users className="w-4 h-4 text-[#00E5FF] shrink-0" />
                     <h3 className="text-sm font-bold text-[#F5F7FA]">
@@ -1994,10 +2243,69 @@ export default function App() {
               </div>
             </div>
 
-            {/* Right 5 Columns: Configuration & Export Controls */}
-            <div className="lg:col-span-5 glass-card p-5 sm:p-6 space-y-5">
+            {/* Right / Bottom 5 Columns: Scrollable Configuration & Export Controls */}
+            <div
+              ref={rightPanelRef}
+              onScroll={handleRightPanelScroll}
+              className="lg:col-span-5 min-w-0 glass-card p-3.5 sm:p-5 space-y-4 sm:space-y-5 max-h-[46vh] sm:max-h-[48vh] lg:max-h-[calc(100vh-5.75rem)] overflow-y-auto studio-panel-scroll lg:sticky lg:top-20"
+            >
+            {/* Sticky Quick-Step Next-by-Next Bar */}
+            <div className="sticky top-0 z-20 -mx-3.5 sm:-mx-5 -mt-3.5 sm:-mt-5 px-3 sm:px-4 py-2 sm:py-2.5 bg-[#0D131F]/95 backdrop-blur-xl border-b border-[#00E5FF]/20 rounded-t-[20px] flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+                {STUDIO_CONTROL_STEPS.map((step) => {
+                  const isActive = activeControlStep === step.id;
+                  return (
+                    <button
+                      key={step.id}
+                      type="button"
+                      onClick={() => scrollToControlStep(step.id)}
+                      className={`px-2 py-1 text-[11px] font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                        isActive
+                          ? "bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12] font-bold"
+                          : "text-[#94A3B8] hover:text-[#F5F7FA] hover:bg-white/5"
+                      }`}
+                    >
+                      {step.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const prevIdx = Math.max(0, stepControlIndex - 1);
+                    scrollToControlStep(STUDIO_CONTROL_STEPS[prevIdx].id);
+                  }}
+                  disabled={stepControlIndex <= 0}
+                  aria-label="Previous editing step"
+                  title="Previous editing option"
+                  className="p-1 rounded-md border border-[#00E5FF]/20 bg-[#161D2B] text-[#E2E8F0] hover:border-[#00E5FF]/60 disabled:opacity-35 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextIdx = Math.min(
+                      STUDIO_CONTROL_STEPS.length - 1,
+                      stepControlIndex + 1
+                    );
+                    scrollToControlStep(STUDIO_CONTROL_STEPS[nextIdx].id);
+                  }}
+                  disabled={stepControlIndex >= STUDIO_CONTROL_STEPS.length - 1}
+                  aria-label="Next editing step"
+                  title="Next editing option"
+                  className="inline-flex items-center gap-0.5 px-2 py-1 rounded-md border border-[#00E5FF]/30 bg-[#161D2B] text-[11px] font-semibold text-[#00E5FF] hover:border-[#00E5FF] disabled:opacity-35 cursor-pointer disabled:cursor-not-allowed whitespace-nowrap"
+                >
+                  <span>Next</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
             {/* 1. Crop Size Preset */}
-            <div>
+            <div id="studio-step-size" className="scroll-mt-14">
               <label
                 htmlFor="preset-select"
                 className="block text-xs font-semibold text-[#E2E8F0] mb-1.5"
@@ -2138,7 +2446,7 @@ export default function App() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <div className="grid grid-cols-4 gap-1 p-1 bg-[#080B12] border border-[#00E5FF]/20 rounded-lg">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 p-1 bg-[#080B12] border border-[#00E5FF]/20 rounded-lg">
                       <button
                         type="button"
                         onClick={() => setCountMode("max")}
@@ -2266,7 +2574,7 @@ export default function App() {
             </div>
 
             {/* 3. Background Color & Cut Lines */}
-            <div className="space-y-3">
+            <div id="studio-step-bg" className="space-y-3 scroll-mt-14">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-[#E2E8F0]">
                   03. Background Color (for Cutouts)
@@ -2282,27 +2590,46 @@ export default function App() {
                 </label>
               </div>
 
-              <div className="grid grid-cols-4 gap-2">
-                {BG_COLORS.map((c) => (
-                  <button
-                    key={c.hex}
-                    type="button"
-                    onClick={() => setBgColor(c.hex)}
-                    className={`flex flex-col items-center p-2 rounded-lg border text-xs transition-colors cursor-pointer ${
-                      bgColor.toUpperCase() === c.hex
-                        ? "border-[#00E5FF] bg-[#00E5FF]/15 font-semibold text-[#F5F7FA]"
-                        : "border-[#00E5FF]/15 bg-[#080B12]/70 hover:border-[#00E5FF]/40 text-[#94A3B8]"
-                    }`}
-                  >
-                    <span
-                      className="w-5 h-5 rounded-full border border-white/25 mb-1"
-                      style={{ backgroundColor: c.hex }}
-                    />
-                    <span className="truncate w-full text-center text-[11px]">
-                      {c.name}
-                    </span>
-                  </button>
-                ))}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {resolvedBackgrounds.map((bg) => {
+                  const isImage = bg.preset_type === "image" && bg.image_url;
+                  const hex = (bg.hex_color || "#FFFFFF").toUpperCase();
+                  const active = isImage
+                    ? bgImageUrl === bg.image_url
+                    : !bgImageUrl && bgColor.toUpperCase() === hex;
+                  return (
+                    <button
+                      key={bg.id}
+                      type="button"
+                      onClick={() =>
+                        isImage
+                          ? setBgPreset(hex, bg.image_url)
+                          : setBgColor(hex)
+                      }
+                      className={`flex flex-col items-center p-2 rounded-lg border text-xs transition-colors cursor-pointer ${
+                        active
+                          ? "border-[#00E5FF] bg-[#00E5FF]/15 font-semibold text-[#F5F7FA]"
+                          : "border-[#00E5FF]/15 bg-[#080B12]/70 hover:border-[#00E5FF]/40 text-[#94A3B8]"
+                      }`}
+                    >
+                      {isImage ? (
+                        <img
+                          src={bg.image_url!}
+                          alt={bg.name}
+                          className="w-6 h-5 rounded border border-white/25 mb-1 object-cover"
+                        />
+                      ) : (
+                        <span
+                          className="w-5 h-5 rounded-full border border-white/25 mb-1"
+                          style={{ backgroundColor: hex }}
+                        />
+                      )}
+                      <span className="truncate w-full text-center text-[11px]">
+                        {bg.name}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Outline & Border Size Customization */}
@@ -2352,7 +2679,7 @@ export default function App() {
                   ))}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <div className="flex justify-between text-[11px] text-[#94A3B8] mb-0.5">
                       <span>Outline Thickness</span>
@@ -2395,7 +2722,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs text-[#94A3B8] mr-1">Color:</span>
                     {BORDER_COLOR_PRESETS.map((c) => (
@@ -2437,7 +2764,7 @@ export default function App() {
             </div>
 
             {/* 3b. Formal Passport Dress Generator (Student, Officer, Men, Women) */}
-            <div className="space-y-2.5 pt-2 border-t border-[#00E5FF]/15">
+            <div id="studio-step-dress" className="space-y-2.5 pt-2 border-t border-[#00E5FF]/15 scroll-mt-14">
               <div className="flex items-center justify-between">
                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#E2E8F0]">
                   <Shirt className="w-3.5 h-3.5 text-[#00E5FF]" />
@@ -2460,15 +2787,23 @@ export default function App() {
               </div>
 
               {/* Category Filter */}
-              <div className="flex flex-wrap gap-1 p-1 bg-[#080B12] border border-[#00E5FF]/20 rounded-lg">
+              <div className="grid grid-cols-4 sm:grid-cols-7 gap-1 p-1 bg-[#080B12] border border-[#00E5FF]/20 rounded-lg">
                 {(
-                  ["All", "Student", "Officer", "Men", "Women", "Formal"] as const
+                  [
+                    "All",
+                    "Student",
+                    "Officer",
+                    "Men",
+                    "Women",
+                    "Formal",
+                    "Custom",
+                  ] as const
                 ).map((cat) => (
                   <button
                     key={cat}
                     type="button"
                     onClick={() => setDressCategory(cat)}
-                    className={`flex-1 min-w-[52px] px-2 py-1 text-[11px] font-semibold rounded-md transition-colors cursor-pointer ${
+                    className={`px-1.5 py-1.5 text-[11px] font-semibold rounded-md transition-colors cursor-pointer text-center ${
                       dressCategory === cat
                         ? "bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12]"
                         : "text-[#94A3B8] hover:text-[#F5F7FA]"
@@ -2480,9 +2815,11 @@ export default function App() {
               </div>
 
               {/* Visual Outfit Thumbnail Grid */}
-              <div className="grid grid-cols-3 gap-1.5 max-h-52 overflow-y-auto pr-0.5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-56 overflow-y-auto pr-0.5">
                 {filteredDresses.map((d) => {
-                  const thumbUrl = buildDressDataUrl(d.id);
+                  const thumbUrl =
+                    d.customUrl ||
+                    buildDressDataUrl((d.builtinStyleId || d.id) as DressStyleId);
                   const isSelected = dressId === d.id;
                   return (
                     <button
@@ -2517,7 +2854,7 @@ export default function App() {
               </div>
 
               {dressId !== "none" && (
-                <div className="grid grid-cols-3 gap-2.5 pt-1 bg-[#080B12]/75 border border-[#00E5FF]/20 rounded-lg p-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 bg-[#080B12]/75 border border-[#00E5FF]/20 rounded-lg p-2.5">
                   <div>
                     <div className="flex justify-between text-[11px] text-[#94A3B8] mb-0.5">
                       <span>Size</span>
@@ -2574,11 +2911,11 @@ export default function App() {
             </div>
 
             {/* 4. Name & DOP Strip */}
-            <div>
+            <div id="studio-step-name" className="scroll-mt-14">
               <label className="block text-xs font-semibold text-[#E2E8F0] mb-1.5">
                 04. Name &amp; Date Strip (Optional for Govt Exams)
               </label>
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <input
                   type="text"
                   placeholder="Candidate Name"
@@ -2634,7 +2971,7 @@ export default function App() {
             )}
 
             {/* Primary Export & Order Buttons */}
-            <div className="pt-2 border-t border-[#00E5FF]/15 space-y-2.5">
+            <div id="studio-step-export" className="pt-2 border-t border-[#00E5FF]/15 space-y-2.5 scroll-mt-14">
               <button
                 type="button"
                 onClick={handleDownloadSingle}
@@ -2660,7 +2997,7 @@ export default function App() {
                 </span>
               </button>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => handleDownloadSheet("4x6")}
@@ -2714,6 +3051,9 @@ export default function App() {
         {/* Full Commercial Printing Showcase, Portfolio Gallery, Workflow, Quote, About & Contact */}
         <LandingSections
           supportEmail={supportEmail}
+          cmsSettings={cmsData?.settings}
+          cmsServices={cmsData?.services}
+          cmsPortfolio={cmsData?.portfolio}
           onOpenMailModal={(subj, body) => handleOpenMailQuery(body, subj)}
           onLaunchStudioMode={(mode) => {
             setWorkspaceMode(mode);
@@ -2756,10 +3096,19 @@ export default function App() {
               Combining true 300 PPI passport &amp; ID tools with bespoke
               commercial print production.
             </p>
-            <p className="text-xs font-mono-nums text-[#00E5FF]">
+            <p className="text-xs font-mono-nums text-[#00E5FF] break-all">
               Official Print Desk: {supportEmail}
             </p>
-            <p className="text-xs font-mono-nums text-[#94A3B8]">
+            <p className="text-xs font-mono-nums text-[#94A3B8] break-all">
+              Support Mail:{" "}
+              <a
+                href={`mailto:${OFFICIAL_SUPPORT_EMAIL}`}
+                className="text-[#00E5FF] hover:underline"
+              >
+                {OFFICIAL_SUPPORT_EMAIL}
+              </a>
+            </p>
+            <p className="text-xs font-mono-nums text-[#94A3B8] break-all">
               Official Website:{" "}
               <a
                 href={OFFICIAL_SITE_URL}
@@ -2820,6 +3169,18 @@ export default function App() {
                   Contact Print Desk
                 </a>
               </li>
+              <li>
+                <a
+                  href="/admin"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    navigateToAdmin();
+                  }}
+                  className="hover:text-[#00E5FF] transition-colors"
+                >
+                  Admin Dashboard
+                </a>
+              </li>
             </ul>
           </div>
 
@@ -2844,7 +3205,7 @@ export default function App() {
           </div>
         </div>
 
-        <div className="border-t border-white/5 py-5">
+        <div className="border-t border-white/5 pt-5 pb-20 sm:pb-8">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-[#94A3B8]">
             <span>
               © {new Date().getFullYear()} {BRAND_NAME}. All rights reserved.

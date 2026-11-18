@@ -18,7 +18,7 @@ Key capabilities of SUN-NOVA PRINT SERVICE:
 3. Passport Dress Generator: Student, Officer, Men, Women, and Formal outfits with Size/X/Y adjustment.
 4. Outline & Border Customization: Solid/Dashed/Dotted styles, 0–16 px width, Flush or Outer Cut Offset, custom color.
 5. Aadhaar, PAN, Voter ID & DL Xerox Sheet: Front/Back via Upload, Camera, or Upload One & Crop Both, Side-by-Side / Up-Down / 2×2 Grid / Front Only, Custom mm size, B&W Xerox polish.
-6. PDF & Text Converters: Photo to PDF, PDF to Photo (150–300 DPI), Text to Image, Image to Text (OCR).
+6. PDF, XML & Text Converters: Photo to PDF, PDF to Photo (150–300 DPI), Text to Image, Image to Text (OCR), and XML Converter (XML <-> JSON, CSV, Formatted/Minified XML, Plain Text).
 7. Professional Resume Maker: Presets for Business, Teacher, Finance, IT, Healthcare, Sales, Student, and Custom roles with 4 templates, Undo/Redo, and 300 PPI PDF/JPG/PNG export.
 8. Contact Policy: NEVER display or invent any phone number. All customer queries go strictly via Email.
 

@@ -30,21 +30,21 @@ class RootErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-slate-50 text-slate-900 flex items-center justify-center p-6">
-          <div className="max-w-md w-full bg-white border border-slate-200 rounded-xl p-6 space-y-4">
-            <h1 className="text-lg font-bold text-slate-900">
+        <div className="min-h-screen bg-[#080B12] text-[#F5F7FA] flex items-center justify-center p-6">
+          <div className="max-w-md w-full bg-[#111827] border border-cyan-400/20 rounded-2xl p-6 space-y-4 shadow-[0_24px_64px_rgba(0,0,0,0.65)]">
+            <h1 className="text-lg font-bold text-[#00E5FF] tracking-wide">
               SUN-NOVA PRINT SERVICE
             </h1>
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-[#94A3B8]">
               The studio encountered a browser error while loading:
             </p>
-            <p className="text-xs font-mono bg-slate-100 text-red-700 rounded-lg p-3 break-words">
+            <p className="text-xs font-mono bg-[#080B12] border border-rose-500/30 text-rose-300 rounded-lg p-3 break-words">
               {this.state.message}
             </p>
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg cursor-pointer"
+              className="px-4 py-2 text-xs font-semibold text-[#080B12] bg-[#00E5FF] hover:bg-cyan-300 rounded-lg cursor-pointer transition-colors"
             >
               Reload Page
             </button>

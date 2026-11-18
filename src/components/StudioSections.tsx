@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import {
   BRAND_NAME,
+  OFFICIAL_SUPPORT_EMAIL,
   PAPER_SIZES,
   PaperKey,
   PHOTO_PRESETS,
@@ -59,9 +60,9 @@ export function StudioSections({
       : activePreset.printH;
 
   return (
-    <div className="space-y-10 mt-10">
+    <div className="space-y-8 sm:space-y-10 mt-8 sm:mt-10">
       {/* Paper Capacity & Uniform Gap Matrix */}
-      <section id="paper-matrix" className="glass-card p-6 sm:p-8">
+      <section id="paper-matrix" className="glass-card p-4 sm:p-6 lg:p-8">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
           <div>
             <h2 className="text-xl sm:text-2xl font-bold text-[#F5F7FA]">
@@ -162,8 +163,8 @@ export function StudioSections({
         id="print-services"
         className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start"
       >
-        <div className="lg:col-span-8 glass-card p-6 sm:p-8">
-          <h2 className="text-xl sm:text-2xl font-bold text-[#F5F7FA] mb-6">
+        <div className="lg:col-span-8 glass-card p-4 sm:p-6 lg:p-8">
+          <h2 className="text-xl sm:text-2xl font-bold text-[#F5F7FA] mb-5 sm:mb-6">
             02. Studio Standards for {BRAND_NAME}
           </h2>
 
@@ -227,7 +228,7 @@ export function StudioSections({
         </div>
 
         {/* Mail Desk, Theme & Direct Share Setup */}
-        <div className="lg:col-span-4 glass-card p-6 sm:p-8 space-y-4">
+        <div className="lg:col-span-4 glass-card p-4 sm:p-6 lg:p-8 space-y-4">
           <div className="flex items-center gap-2 text-[#F5F7FA] font-bold text-base">
             <Mail className="w-5 h-5 text-[#00E5FF] shrink-0" />
             <span>Mail Desk &amp; Studio Setup</span>
@@ -240,10 +241,10 @@ export function StudioSections({
             and customize your interactive studio accent.
           </p>
 
-          <div>
+          <div className="space-y-2">
             <label
               htmlFor="support-email-input"
-              className="block text-xs font-semibold text-[#E2E8F0] mb-1.5"
+              className="block text-xs font-semibold text-[#E2E8F0]"
             >
               Print Desk Email (for Queries)
             </label>
@@ -255,6 +256,17 @@ export function StudioSections({
               placeholder="studio@example.com"
               className="w-full bg-[#080B12] border border-[#00E5FF]/20 rounded-lg px-3 py-2 text-sm text-[#F5F7FA] focus:outline-none focus:ring-2 focus:ring-[#00E5FF]"
             />
+            <div className="text-[11px] text-[#94A3B8] flex flex-wrap items-center justify-between gap-1.5">
+              <span>Support Mail:</span>
+              <button
+                type="button"
+                onClick={() => onChangeSupportEmail(OFFICIAL_SUPPORT_EMAIL)}
+                className="font-mono-nums text-[#00E5FF] hover:underline break-all text-left cursor-pointer"
+                title="Use official Support Mail as active query desk"
+              >
+                {OFFICIAL_SUPPORT_EMAIL}
+              </button>
+            </div>
           </div>
 
           <div>

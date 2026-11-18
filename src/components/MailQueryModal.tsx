@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Check, Copy, ExternalLink, Mail, X } from "lucide-react";
-import { BRAND_NAME } from "../types/photo";
+import { BRAND_NAME, OFFICIAL_SUPPORT_EMAIL } from "../types/photo";
 
 interface MailQueryModalProps {
   isOpen: boolean;
@@ -22,6 +22,9 @@ export function MailQueryModal({
   const [subject, setSubject] = useState(initialSubject);
   const [messageBody, setMessageBody] = useState(initialBody);
   const [copied, setCopied] = useState(false);
+  const [recipientMode, setRecipientMode] = useState<"desk" | "support">(
+    "support"
+  );
 
   useEffect(() => {
     if (!isOpen) return;
@@ -31,6 +34,9 @@ export function MailQueryModal({
   }, [isOpen, initialSubject, initialBody]);
 
   if (!isOpen) return null;
+
+  const activeRecipient =
+    recipientMode === "support" ? OFFICIAL_SUPPORT_EMAIL : supportEmail.trim();
 
   const fullBody = [
     customerName.trim() ? `From: ${customerName.trim()}` : "",
@@ -43,7 +49,7 @@ export function MailQueryModal({
     .trim();
 
   const mailtoHref = `mailto:${encodeURIComponent(
-    supportEmail.trim()
+    activeRecipient
   )}?subject=${encodeURIComponent(subject.trim())}&body=${encodeURIComponent(
     fullBody
   )}`;
@@ -51,7 +57,7 @@ export function MailQueryModal({
   const handleCopyDraft = async () => {
     try {
       await navigator.clipboard.writeText(
-        `To: ${supportEmail}\nSubject: ${subject}\n\n${fullBody}`
+        `To: ${activeRecipient}\nSubject: ${subject}\n\n${fullBody}`
       );
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
@@ -65,17 +71,17 @@ export function MailQueryModal({
       role="dialog"
       aria-modal="true"
       aria-label="Send Query on Mail"
-      className="fixed inset-0 z-50 bg-[#080B12]/80 backdrop-blur-md flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-[#080B12]/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4"
     >
-      <div className="bg-[#111827]/95 backdrop-blur-xl rounded-[20px] border border-[#00E5FF]/25 max-w-lg w-full overflow-hidden shadow-[0_16px_48px_rgba(0,0,0,0.6)]">
-        <div className="px-5 py-4 border-b border-[#00E5FF]/15 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <Mail className="w-4 h-4 text-[#00E5FF]" />
-            <div>
-              <h3 className="text-sm font-bold text-[#F5F7FA]">
+      <div className="bg-[#111827]/95 backdrop-blur-xl rounded-[20px] border border-[#00E5FF]/25 max-w-lg w-full max-h-[92vh] overflow-y-auto shadow-[0_16px_48px_rgba(0,0,0,0.6)]">
+        <div className="px-4 sm:px-5 py-4 border-b border-[#00E5FF]/15 flex items-center justify-between gap-3 sticky top-0 bg-[#111827]/95 backdrop-blur-xl z-10">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Mail className="w-4 h-4 text-[#00E5FF] shrink-0" />
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold text-[#F5F7FA] truncate">
                 Send Query on Mail · {BRAND_NAME}
               </h3>
-              <p className="text-[11px] text-[#94A3B8]">
+              <p className="text-[11px] text-[#94A3B8] truncate">
                 Direct email support &amp; print quotation requests
               </p>
             </div>
@@ -84,18 +90,53 @@ export function MailQueryModal({
             type="button"
             onClick={onClose}
             aria-label="Close mail modal"
-            className="p-1.5 text-[#94A3B8] hover:text-[#F5F7FA] rounded-lg hover:bg-white/5 cursor-pointer"
+            className="p-1.5 text-[#94A3B8] hover:text-[#F5F7FA] rounded-lg hover:bg-white/5 cursor-pointer shrink-0"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="p-5 space-y-3.5">
-          <div className="text-xs bg-[#161D2B] border border-[#00E5FF]/20 rounded-lg px-3 py-2 flex items-center justify-between gap-2">
-            <span className="text-[#94A3B8]">To Print Desk:</span>
-            <span className="font-mono-nums font-semibold text-[#00E5FF] truncate">
-              {supportEmail}
-            </span>
+        <div className="p-4 sm:p-5 space-y-3.5">
+          <div className="space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 p-1 bg-[#080B12] border border-[#00E5FF]/20 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setRecipientMode("support")}
+                className={`px-2.5 py-2 rounded-lg text-[11px] font-semibold transition-all text-left cursor-pointer ${
+                  recipientMode === "support"
+                    ? "bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12]"
+                    : "text-[#94A3B8] hover:text-[#F5F7FA]"
+                }`}
+              >
+                <div className="uppercase tracking-wider text-[10px] opacity-80">
+                  Support Mail
+                </div>
+                <div className="font-mono-nums truncate">
+                  {OFFICIAL_SUPPORT_EMAIL}
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setRecipientMode("desk")}
+                className={`px-2.5 py-2 rounded-lg text-[11px] font-semibold transition-all text-left cursor-pointer ${
+                  recipientMode === "desk"
+                    ? "bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12]"
+                    : "text-[#94A3B8] hover:text-[#F5F7FA]"
+                }`}
+              >
+                <div className="uppercase tracking-wider text-[10px] opacity-80">
+                  Print Desk
+                </div>
+                <div className="font-mono-nums truncate">{supportEmail}</div>
+              </button>
+            </div>
+
+            <div className="text-xs bg-[#161D2B] border border-[#00E5FF]/20 rounded-lg px-3 py-2 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[#94A3B8]">Sending To:</span>
+              <span className="font-mono-nums font-semibold text-[#00E5FF] break-all">
+                {activeRecipient}
+              </span>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

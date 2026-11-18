@@ -109,10 +109,12 @@ export function StudioAiAgent({
         <button
           type="button"
           onClick={() => onToggle(true)}
-          className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 bg-[#111827]/90 backdrop-blur-xl hover:bg-[#161D2B] text-[#F5F7FA] text-xs sm:text-sm font-semibold px-4 py-3 rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.5),0_0_20px_rgba(0,229,255,0.2)] border border-[#00E5FF]/35 transition-transform hover:scale-[1.02] cursor-pointer"
+          aria-label="Ask AI Agent"
+          title="Ask AI Agent"
+          className="fixed bottom-4 right-4 z-40 inline-flex items-center justify-center gap-2 bg-[#111827]/92 backdrop-blur-xl hover:bg-[#161D2B] text-[#F5F7FA] text-xs font-semibold w-11 h-11 sm:w-auto sm:h-auto sm:px-3.5 sm:py-2.5 rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.55),0_0_20px_rgba(0,229,255,0.22)] border border-[#00E5FF]/35 transition-transform hover:scale-[1.03] cursor-pointer"
         >
           <Sparkles className="w-4 h-4 text-[#00E5FF] shrink-0" />
-          <span>Ask AI Agent</span>
+          <span className="hidden sm:inline">Ask AI Agent</span>
         </button>
       )}
 

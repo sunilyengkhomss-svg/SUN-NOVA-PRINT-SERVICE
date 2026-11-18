@@ -4,6 +4,8 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { GoogleGenAI } from "@google/genai";
+import { handleApiRequest } from "./src/backend/apiRouter";
+import { getLocalAdapters } from "./src/backend/localAdapters";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,11 +36,12 @@ Key capabilities of SUN-NOVA PRINT SERVICE you can help users with:
 5. Aadhaar, PAN, Voter ID & DL Xerox Sheet (A4 / 4×6):
    - Front Side & Back Side via Upload, Camera Click, or "Upload One & Crop Both" (crop Front and Back from a single photo or E-Aadhaar scan).
    - Arrangements: Side-by-Side, Up / Down (Front top, Back bottom), 2×2 Grid, and Front Only, plus Top/Mid/Bottom sheet anchor, 85.6×54 mm CR80 or Custom mm Document Size Maker, and B&W Xerox / Grayscale / Full Color polish.
-6. PDF & Text Converters Tab:
+6. PDF, XML & Text Converters Tab:
    - Photo to PDF: Combine multiple JPG/PNG/WEBP/Camera photos into a multi-page A4, Letter, 4×6, or Fit-to-Image PDF.
    - PDF to Photo: Convert PDF pages into 150–300 DPI JPG or PNG images and optionally run OCR on any page.
    - Text to Image: Render formatted notices, quotes, bio-data, or notes into custom PNG or 300 PPI JPG images.
    - Image to Text (OCR): Extract printed or handwritten text, ID card details, or tables from photos and scans into editable, copyable .txt output.
+   - XML File Converter: Validate and convert XML files to JSON, CSV, formatted/pretty XML, minified XML, or plain text, and convert JSON/CSV back to XML.
 7. Professional Resume Maker & Undo/Redo:
    - Role-ready presets for Business & Management, Teacher & Educator, Accountant & Finance, Software & IT, Healthcare, Sales, Fresh Graduate, and Custom/Any Profession.
    - 4 templates (Executive Classic, Modern Sidebar, Teacher & Academic CV, ATS Compact), custom accent colors, fonts, optional photo upload/camera click, reorderable/renamable sections, optional AI Summary Polish & Bullet Suggestions, and 300 PPI PDF / JPG / PNG download.
@@ -57,9 +60,10 @@ interface ChatTurn {
 
 async function startServer() {
   const app = express();
-  app.use(express.json({ limit: "12mb" }));
+  const { db: localDb, bucket: localBucket } = getLocalAdapters(__dirname);
+  const jsonParser = express.json({ limit: "12mb" });
 
-  app.post("/api/chat", async (req, res) => {
+  app.post("/api/chat", jsonParser, async (req, res) => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       res.status(500).json({
@@ -176,7 +180,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/ocr", async (req, res) => {
+  app.post("/api/ocr", jsonParser, async (req, res) => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       res.status(500).json({
@@ -287,7 +291,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/resume-assist", async (req, res) => {
+  app.post("/api/resume-assist", jsonParser, async (req, res) => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       res.status(500).json({
@@ -369,6 +373,82 @@ async function startServer() {
       }
       console.error("Gemini resume assist error:", err);
       res.status(503).json({ error: friendlyMsg });
+    }
+  });
+
+  // Unified D1/R2 Backend API Router for CMS, Admin, Media, Quotes & Messages
+  app.use(async (req, res, next) => {
+    if (!req.path.startsWith("/api/")) return next();
+    try {
+      const protocol = req.protocol || "http";
+      const host = req.get("host") || `localhost:${PORT}`;
+      const fullUrl = `${protocol}://${host}${req.originalUrl}`;
+
+      const headers = new Headers();
+      for (const [k, v] of Object.entries(req.headers)) {
+        if (typeof v === "string") headers.set(k, v);
+        else if (Array.isArray(v)) headers.set(k, v.join(", "));
+      }
+
+      let bodyBytes: Uint8Array | undefined;
+      if (req.method !== "GET" && req.method !== "HEAD") {
+        const chunks: Buffer[] = [];
+        let total = 0;
+        const maxBody = 110 * 1024 * 1024;
+        for await (const chunk of req) {
+          const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          total += buf.length;
+          if (total > maxBody) {
+            res.status(413).json({ error: "Payload exceeds maximum upload size." });
+            return;
+          }
+          chunks.push(buf);
+        }
+        if (chunks.length > 0) {
+          bodyBytes = new Uint8Array(Buffer.concat(chunks));
+        }
+      }
+
+      const webReq = new Request(fullUrl, {
+        method: req.method,
+        headers,
+        body: bodyBytes ? (bodyBytes as unknown as BodyInit) : undefined,
+      });
+
+      const apiRes = await handleApiRequest(webReq, {
+        DB: localDb,
+        MEDIA_BUCKET: localBucket,
+        GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+        ADMIN_SETUP_TOKEN: process.env.ADMIN_SETUP_TOKEN,
+        RESEND_API_KEY: process.env.RESEND_API_KEY,
+        EMAIL_FROM: process.env.EMAIL_FROM,
+      });
+
+      if (!apiRes) return next();
+
+      res.status(apiRes.status);
+      apiRes.headers.forEach((value, key) => {
+        if (key.toLowerCase() === "set-cookie") {
+          const existing = res.getHeader("set-cookie");
+          if (existing) {
+            const arr = Array.isArray(existing) ? existing : [String(existing)];
+            res.setHeader("set-cookie", [...arr, value]);
+          } else {
+            res.setHeader("set-cookie", value);
+          }
+        } else {
+          res.setHeader(key, value);
+        }
+      });
+
+      if (apiRes.body) {
+        const arrayBuf = await apiRes.arrayBuffer();
+        res.send(Buffer.from(arrayBuf));
+      } else {
+        res.end();
+      }
+    } catch (err) {
+      next(err);
     }
   });
 

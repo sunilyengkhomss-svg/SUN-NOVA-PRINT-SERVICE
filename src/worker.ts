@@ -1,16 +1,11 @@
 import { onRequestPost as handleChatPost } from "../functions/api/chat";
 import { onRequestPost as handleOcrPost } from "../functions/api/ocr";
 import { onRequestPost as handleResumeAssistPost } from "../functions/api/resume-assist";
-
-interface WorkerEnv {
-  GEMINI_API_KEY?: string;
-  ASSETS: {
-    fetch: (request: Request) => Promise<Response>;
-  };
-}
+import { handleApiRequest } from "./backend/apiRouter";
+import { AppWorkerEnv } from "./backend/d1Types";
 
 export default {
-  async fetch(request: Request, env: WorkerEnv): Promise<Response> {
+  async fetch(request: Request, env: AppWorkerEnv): Promise<Response> {
     const url = new URL(request.url);
 
     if (request.method === "POST") {
@@ -26,12 +21,18 @@ export default {
     }
 
     if (url.pathname.startsWith("/api/")) {
+      const apiRes = await handleApiRequest(request, env);
+      if (apiRes) return apiRes;
       return Response.json(
         { error: "Unsupported API route or HTTP method." },
-        { status: 405 }
+        { status: 404 }
       );
     }
 
-    return env.ASSETS.fetch(request);
+    if (env.ASSETS) {
+      return env.ASSETS.fetch(request);
+    }
+
+    return new Response("Not Found", { status: 404 });
   },
 };
