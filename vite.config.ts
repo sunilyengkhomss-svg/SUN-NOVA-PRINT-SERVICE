@@ -10,7 +10,17 @@ function normalizeBaseUrl(raw?: string): string {
   const val = (raw || "").trim();
   if (!val || val === "/") return "/";
   if (/^https?:\/\//i.test(val)) {
-    return val.endsWith("/") ? val : `${val}/`;
+    try {
+      const parsed = new URL(val);
+      const pathname = parsed.pathname || "/";
+      const normalized = pathname.endsWith("/") ? pathname : `${pathname}/`;
+      console.warn(
+        `[vite-build] VITE_BASE_URL ("${val}") contains an origin; using same-origin base "${normalized}" so scripts load on any active host.`
+      );
+      return normalized.startsWith("/") ? normalized : `/${normalized}`;
+    } catch {
+      return "/";
+    }
   }
   const withLead = val.startsWith("/") ? val : `/${val}`;
   return withLead.endsWith("/") ? withLead : `${withLead}/`;

@@ -104,7 +104,11 @@ function auditBuildEnvironment(config) {
   }
 
   const base = (process.env.VITE_BASE_URL || "").trim();
-  if (base && base !== "/" && !base.startsWith("/") && !/^https?:\/\//i.test(base)) {
+  if (/^https?:\/\//i.test(base)) {
+    console.warn(
+      `[wrangler-sync] Warning: VITE_BASE_URL ("${base}") includes an origin. Set VITE_BASE_URL="/" in Build Variables; Vite will use same-origin "/" automatically.`
+    );
+  } else if (base && base !== "/" && !base.startsWith("/")) {
     console.log(`[wrangler-sync] Normalized VITE_BASE_URL "${base}" -> "/${base.replace(/\/+$/, "")}/".`);
   }
 }
