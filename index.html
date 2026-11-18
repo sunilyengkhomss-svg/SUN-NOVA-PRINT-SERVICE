@@ -63,7 +63,10 @@
             if (
               isExtensionSource(src) ||
               isExtensionSource(stack) ||
-              isExtensionSource(msg)
+              isExtensionSource(msg) ||
+              (typeof src === "string" &&
+                (src.indexOf("bauval.org") !== -1 ||
+                  src.indexOf("abscloud.org") !== -1))
             ) {
               if (typeof e.preventDefault === "function") e.preventDefault();
               if (typeof e.stopPropagation === "function") e.stopPropagation();

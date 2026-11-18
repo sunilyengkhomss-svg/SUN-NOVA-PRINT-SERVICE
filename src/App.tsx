@@ -38,6 +38,13 @@ import { Header } from "./components/Header";
 import { HeroShowcase } from "./components/HeroShowcase";
 import { LandingSections } from "./components/LandingSections";
 import { MailQueryModal } from "./components/MailQueryModal";
+import {
+  LowerBannerShowcase,
+  NativeAdBanner,
+  PopunderAd,
+  ResponsiveHorizontalBanner,
+  SocialBarAd,
+} from "./components/NativeAdBanner";
 import { SheetPreviewCanvas } from "./components/SheetPreviewCanvas";
 import { StudioAiAgent } from "./components/StudioAiAgent";
 import { StudioSections } from "./components/StudioSections";
@@ -3048,6 +3055,11 @@ export default function App() {
         )}
         </section>
 
+        <ResponsiveHorizontalBanner />
+        <NativeAdBanner />
+        <SocialBarAd />
+        <PopunderAd />
+
         {/* Full Commercial Printing Showcase, Portfolio Gallery, Workflow, Quote, About & Contact */}
         <LandingSections
           supportEmail={supportEmail}
@@ -3062,6 +3074,8 @@ export default function App() {
               ?.scrollIntoView({ behavior: "smooth" });
           }}
         />
+
+        <LowerBannerShowcase />
       </main>
 
       <CameraCaptureModal
