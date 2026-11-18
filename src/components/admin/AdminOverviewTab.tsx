@@ -229,7 +229,7 @@ export function AdminOverviewTab({
                 <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0" />
               )}
               <h2 className="text-sm font-bold text-[#F5F7FA]">
-                Cloudflare Bindings &amp; Storage Status
+                Cloudflare Bindings &amp; Worker Runtime Readiness
               </h2>
             </div>
             <span className="text-[11px] font-mono-nums text-[#94A3B8]">
@@ -306,7 +306,7 @@ export function AdminOverviewTab({
                   <p className="text-[11px] text-[#94A3B8] truncate">
                     {storageStatus.geminiConfigured
                       ? "Chat, OCR & Resume AI active"
-                      : "Optional server secret"}
+                      : "Optional runtime secret"}
                   </p>
                 </div>
               </div>
@@ -320,6 +320,57 @@ export function AdminOverviewTab({
             </div>
           </div>
 
+          <div className="mt-3 pt-3 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 text-[11px]">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[#CBD5E1]">
+              <span>
+                <span className="text-[#94A3B8]">Setup Guard (</span>
+                <span className="font-mono-nums">ADMIN_SETUP_TOKEN</span>
+                <span className="text-[#94A3B8]">): </span>
+                <span
+                  className={`font-mono-nums font-semibold ${
+                    storageStatus.setupTokenConfigured ? "text-emerald-400" : "text-[#94A3B8]"
+                  }`}
+                >
+                  {storageStatus.setupTokenConfigured ? "Configured" : "Not Set"}
+                </span>
+              </span>
+              <span aria-hidden="true" className="text-white/20">
+                ·
+              </span>
+              <span>
+                <span className="text-[#94A3B8]">Mail Delivery (</span>
+                <span className="font-mono-nums">RESEND_API_KEY</span>
+                <span className="text-[#94A3B8]">): </span>
+                <span
+                  className={`font-mono-nums font-semibold ${
+                    storageStatus.emailProviderConfigured ? "text-emerald-400" : "text-[#94A3B8]"
+                  }`}
+                >
+                  {storageStatus.emailProviderConfigured ? "Configured" : "Not Set"}
+                </span>
+              </span>
+            </div>
+
+            {(!storageStatus.setupTokenConfigured ||
+              !storageStatus.emailProviderConfigured ||
+              !storageStatus.geminiConfigured) && (
+              <button
+                type="button"
+                onClick={() => copyValue("sync-secrets", "npm run cf:sync-secrets")}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#080B12] border border-white/15 text-[11px] font-mono-nums text-[#E2E8F0] hover:border-[#00E5FF]/50 cursor-pointer"
+              >
+                {copiedId === "sync-secrets" ? (
+                  <Check className="w-3 h-3 text-emerald-400" />
+                ) : (
+                  <Copy className="w-3 h-3 text-[#00E5FF]" />
+                )}
+                <span>
+                  {copiedId === "sync-secrets" ? "Copied" : "Copy: npm run cf:sync-secrets"}
+                </span>
+              </button>
+            )}
+          </div>
+
           {(!storageStatus.d1Bound || !storageStatus.r2Bound) && (
             <div className="mt-3 pt-3 border-t border-white/10 text-xs text-[#CBD5E1] space-y-2">
               <p className="font-semibold text-amber-200">
@@ -328,17 +379,20 @@ export function AdminOverviewTab({
               <ul className="list-disc pl-4 space-y-1.5 text-[11px] text-[#94A3B8]">
                 <li>
                   <span className="text-[#E2E8F0] font-semibold">
-                    Cloudflare Workers (<code className="text-[#00E5FF]">npx wrangler deploy</code> — Build Variables):
+                    Cloudflare Workers Deploy Command:
                   </span>{" "}
-                  Wrangler overwrites Dashboard-only bindings on each push unless declared in <code className="text-[#E2E8F0]">wrangler.jsonc</code>. Set{" "}
-                  <code className="text-[#00E5FF]">D1_DATABASE_ID</code> (and optional <code className="text-[#00E5FF]">R2_BUCKET_NAME</code>) in{" "}
-                  <span className="text-[#E2E8F0]">Workers &amp; Pages → sun-nova-print-service → Settings → Build variables</span> so <code className="text-[#E2E8F0]">npm run build</code> injects them automatically before deploy.
+                  In Cloudflare Builds settings, set <code className="text-[#E2E8F0]">Build command</code> to{" "}
+                  <code className="text-[#00E5FF]">npm run build</code> and <code className="text-[#E2E8F0]">Deploy command</code> to{" "}
+                  <code className="text-[#00E5FF]">npx wrangler deploy</code> (or <code className="text-[#00E5FF]">npm run cf:deploy</code>) — never <code className="text-[#E2E8F0]">dist</code>.
                 </li>
                 <li>
                   <span className="text-[#E2E8F0] font-semibold">
-                    One-Command CLI Setup (Recommended):
+                    D1 &amp; R2 Bindings (Build Variables vs. CLI):
                   </span>{" "}
-                  Run <code className="text-[#00E5FF]">npm run cf:setup</code> locally once to create <code className="text-[#E2E8F0]">sun-nova-db</code> &amp; <code className="text-[#E2E8F0]">sun-nova-media</code>, run migrations, and lock their IDs into <code className="text-[#E2E8F0]">wrangler.jsonc</code>.
+                  Set <code className="text-[#00E5FF]">D1_DATABASE_ID</code> (and optional <code className="text-[#00E5FF]">R2_BUCKET_NAME</code>) in{" "}
+                  <span className="text-[#E2E8F0]">Build variables</span>, or run{" "}
+                  <code className="text-[#00E5FF]">npm run cf:setup</code> once to lock them into <code className="text-[#E2E8F0]">wrangler.jsonc</code>. Note that runtime secrets like <code className="text-[#E2E8F0]">RESEND_API_KEY</code> and <code className="text-[#E2E8F0]">ADMIN_SETUP_TOKEN</code> belong under{" "}
+                  <span className="text-[#E2E8F0]">Workers → Settings → Variables and Secrets</span>.
                 </li>
               </ul>
               <div className="flex flex-wrap gap-2 pt-1">
@@ -368,15 +422,15 @@ export function AdminOverviewTab({
                 </button>
                 <button
                   type="button"
-                  onClick={() => copyValue("r2-var", "R2_BUCKET_NAME")}
+                  onClick={() => copyValue("cf-deploy", "npx wrangler deploy")}
                   className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#080B12] border border-white/15 text-[11px] font-mono-nums text-[#E2E8F0] hover:border-[#00E5FF]/50 cursor-pointer"
                 >
-                  {copiedId === "r2-var" ? (
+                  {copiedId === "cf-deploy" ? (
                     <Check className="w-3.5 h-3.5 text-emerald-400" />
                   ) : (
                     <Copy className="w-3.5 h-3.5 text-[#00E5FF]" />
                   )}
-                  <span>{copiedId === "r2-var" ? "Copied" : "Copy: R2_BUCKET_NAME"}</span>
+                  <span>{copiedId === "cf-deploy" ? "Copied" : "Copy: npx wrangler deploy"}</span>
                 </button>
               </div>
             </div>

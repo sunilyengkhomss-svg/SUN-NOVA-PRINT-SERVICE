@@ -231,10 +231,34 @@ export function AdminAuthGate({
               </div>
 
               <p className="text-[11px] text-[#94A3B8] leading-relaxed">
-                With <code className="text-[#E2E8F0]">npx wrangler deploy</code>, add{" "}
-                <code className="text-[#00E5FF]">D1_DATABASE_ID</code> in Cloudflare Workers Build Variables or run{" "}
+                With <code className="text-[#E2E8F0]">npx wrangler deploy</code> (set as Deploy command, not <code className="text-[#E2E8F0]">dist</code>), add{" "}
+                <code className="text-[#00E5FF]">D1_DATABASE_ID</code> in Build Variables or run{" "}
                 <code className="text-[#E2E8F0]">npm run cf:setup</code> so deployments keep <code className="text-[#E2E8F0]">DB</code> &amp; <code className="text-[#E2E8F0]">MEDIA_BUCKET</code> bound.
               </p>
+
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-[#94A3B8]">
+                <span>
+                  Setup Token:{" "}
+                  <span
+                    className={`font-mono-nums font-semibold ${
+                      storageStatus.setupTokenConfigured ? "text-emerald-400" : "text-[#CBD5E1]"
+                    }`}
+                  >
+                    {storageStatus.setupTokenConfigured ? "Configured" : "Not Set"}
+                  </span>
+                </span>
+                <span aria-hidden="true">·</span>
+                <span>
+                  Resend Mail:{" "}
+                  <span
+                    className={`font-mono-nums font-semibold ${
+                      storageStatus.emailProviderConfigured ? "text-emerald-400" : "text-[#CBD5E1]"
+                    }`}
+                  >
+                    {storageStatus.emailProviderConfigured ? "Configured" : "Not Set"}
+                  </span>
+                </span>
+              </div>
 
               <div className="flex flex-wrap gap-2">
                 <button

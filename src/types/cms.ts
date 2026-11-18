@@ -202,6 +202,8 @@ export interface StorageStatusInfo {
   d1Bound: boolean;
   r2Bound: boolean;
   geminiConfigured: boolean;
+  setupTokenConfigured?: boolean;
+  emailProviderConfigured?: boolean;
   mode: "d1+r2" | "d1+d1blob" | "memory-fallback";
   summary: string;
 }

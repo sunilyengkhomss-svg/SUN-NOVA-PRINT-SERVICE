@@ -6,10 +6,35 @@ import {defineConfig} from 'vite';
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
 
+function normalizeBaseUrl(raw?: string): string {
+  const val = (raw || "").trim();
+  if (!val || val === "/") return "/";
+  if (/^https?:\/\//i.test(val)) {
+    return val.endsWith("/") ? val : `${val}/`;
+  }
+  const withLead = val.startsWith("/") ? val : `/${val}`;
+  return withLead.endsWith("/") ? withLead : `${withLead}/`;
+}
+
+function excludeOrtWasmPlugin() {
+  return {
+    name: "exclude-ort-wasm",
+    generateBundle(_options: unknown, bundle: Record<string, { type: string; source?: Uint8Array | string }>) {
+      if (process.env.EXCLUDE_ORT_WASM !== "true") return;
+      for (const fileName of Object.keys(bundle)) {
+        if (/^ort-wasm.*\.wasm$/i.test(fileName) || /^ort(\.webgpu)?\.bundle\.min\.mjs$/i.test(fileName)) {
+          delete bundle[fileName];
+        }
+      }
+      console.log("[vite-build] EXCLUDE_ORT_WASM=true: stripped bundled ONNX WASM assets (CDN fallback active).");
+    },
+  };
+}
+
 export default defineConfig(() => {
   return {
-    base: process.env.VITE_BASE_URL || '/',
-    plugins: [react(), tailwindcss()],
+    base: normalizeBaseUrl(process.env.VITE_BASE_URL),
+    plugins: [react(), tailwindcss(), excludeOrtWasmPlugin()],
     resolve: {
       alias: {
         '@': path.resolve(rootDir, '.'),

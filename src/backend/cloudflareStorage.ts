@@ -11,6 +11,8 @@ export interface StorageStatusInfo {
   d1Bound: boolean;
   r2Bound: boolean;
   geminiConfigured: boolean;
+  setupTokenConfigured: boolean;
+  emailProviderConfigured: boolean;
   mode: "d1+r2" | "d1+d1blob" | "memory-fallback";
   summary: string;
 }
@@ -793,6 +795,8 @@ export function resolveStorageBindings(env: AppWorkerEnv): {
   const d1Bound = Boolean(env.DB);
   const r2Bound = Boolean(env.MEDIA_BUCKET);
   const geminiConfigured = Boolean(env.GEMINI_API_KEY);
+  const setupTokenConfigured = Boolean(env.ADMIN_SETUP_TOKEN);
+  const emailProviderConfigured = Boolean(env.RESEND_API_KEY);
 
   if (env.DB && env.MEDIA_BUCKET) {
     return {
@@ -802,6 +806,8 @@ export function resolveStorageBindings(env: AppWorkerEnv): {
         d1Bound: true,
         r2Bound: true,
         geminiConfigured,
+        setupTokenConfigured,
+        emailProviderConfigured,
         mode: "d1+r2",
         summary: "Cloudflare D1 (DB) and R2 (MEDIA_BUCKET) active.",
       },
@@ -816,6 +822,8 @@ export function resolveStorageBindings(env: AppWorkerEnv): {
         d1Bound: true,
         r2Bound: false,
         geminiConfigured,
+        setupTokenConfigured,
+        emailProviderConfigured,
         mode: "d1+d1blob",
         summary:
           "Cloudflare D1 (DB) bound; R2 (MEDIA_BUCKET) unbound — storing files in D1 blob fallback (max 1.5 MB/file).",
@@ -830,6 +838,8 @@ export function resolveStorageBindings(env: AppWorkerEnv): {
       d1Bound: false,
       r2Bound,
       geminiConfigured,
+      setupTokenConfigured,
+      emailProviderConfigured,
       mode: "memory-fallback",
       summary:
         "Cloudflare D1 (DB) is not bound yet — running in temporary isolate fallback mode so the site stays online without 503 errors.",
