@@ -78,7 +78,7 @@
               if (failedSrc.indexOf("/src/main.tsx") !== -1) {
                 bootErr = "Unbuilt source deployed (" + failedSrc + "). In Cloudflare Pages, set Build command to 'npm run build' and Build output directory to 'dist' (or upload the built dist/ folder instead of the root repo folder).";
               } else {
-                bootErr = "Failed to load application script (" + failedSrc + "). Check deployment output directory (dist) or hard-refresh.";
+                bootErr = "Failed to load application script (" + failedSrc + "). Deploy built ./dist assets via 'npx wrangler deploy' (not 'Deploy command: dist') and hard-refresh.";
               }
               showBootError(bootErr);
             } else if (e && e.message) {

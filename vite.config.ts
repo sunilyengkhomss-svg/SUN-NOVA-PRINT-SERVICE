@@ -58,14 +58,14 @@ export default defineConfig(() => {
       rolldownOptions: {
         output: {
           codeSplitting: false,
-          entryFileNames: 'script.js',
-          chunkFileNames: 'script.js',
+          entryFileNames: 'assets/script-[hash].js',
+          chunkFileNames: 'assets/script-[hash].js',
           assetFileNames: (assetInfo) => {
             if (
               assetInfo.names?.some((name) => name.endsWith('.css')) ||
               assetInfo.name?.endsWith('.css')
             ) {
-              return 'style.css';
+              return 'assets/style-[hash][extname]';
             }
             return '[name][extname]';
           },
