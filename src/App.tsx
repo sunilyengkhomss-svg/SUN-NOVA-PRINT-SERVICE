@@ -49,6 +49,10 @@ import { AiSkinBeautyModal } from "./components/AiSkinBeautyModal";
 import { SheetPreviewCanvas } from "./components/SheetPreviewCanvas";
 import { StudioAiAgent } from "./components/StudioAiAgent";
 import { StudioSections } from "./components/StudioSections";
+import type {
+  StudioAssistantAction,
+  StudioLiveSnapshot,
+} from "./utils/studioAssistantEngine";
 
 const IdCardXeroxStudio = lazy(() =>
   import("./components/IdCardXeroxStudio").then((m) => ({
@@ -1448,23 +1452,135 @@ export default function App() {
   }, [cmsData?.backgrounds]);
 
   const activeTheme = STUDIO_ACCENTS[studioAccent];
-  const studioContextSummary = useMemo(
-    () =>
-      `Workspace=${workspaceMode}, ActiveCrop=${activeDims.label} (${activeDims.w}x${activeDims.h}px), Paper=${paper.label}, Gap=${gapMm}mm, SheetCount=${effectiveSheetCount}, QueueItems=${sheetQueue.length}, SelectedDress=${dressId}, Outline=${borderWidthPx}px ${outlineStyle}`,
+  const activeDressLabel = useMemo(() => {
+    if (dressId === "none") return "None (Original Outfit)";
+    return (
+      resolvedOutfits.find((o) => o.id === dressId)?.label || dressId
+    );
+  }, [dressId, resolvedOutfits]);
+
+  const studioLiveSnapshot = useMemo<StudioLiveSnapshot>(
+    () => ({
+      workspaceMode,
+      hasImage: Boolean(imageSrc),
+      presetLabel: activeDims.label,
+      dimensionsText: `${activeDims.printW}×${activeDims.printH} px`,
+      paperLabel: paper.label,
+      sheetCount: effectiveSheetCount,
+      gapMm,
+      bgColor,
+      bgRemoved,
+      aiBeautyApplied,
+      dressLabel: activeDressLabel,
+      queueCount: sheetQueue.length,
+      targetKB,
+      supportEmail,
+    }),
     [
       workspaceMode,
+      imageSrc,
       activeDims.label,
-      activeDims.w,
-      activeDims.h,
+      activeDims.printW,
+      activeDims.printH,
       paper.label,
-      gapMm,
       effectiveSheetCount,
+      gapMm,
+      bgColor,
+      bgRemoved,
+      aiBeautyApplied,
+      activeDressLabel,
       sheetQueue.length,
-      dressId,
-      borderWidthPx,
-      outlineStyle,
+      targetKB,
+      supportEmail,
     ]
   );
+
+  const handleAssistantAction = (action: StudioAssistantAction) => {
+    const closeOnCompact = () => {
+      if (typeof window !== "undefined" && window.innerWidth < 768) {
+        setIsAiOpen(false);
+      }
+    };
+
+    const scrollToWorkbench = () => {
+      setTimeout(() => {
+        document
+          .getElementById("studio-workbench")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 60);
+    };
+
+    const jumpPassportStep = (stepId: ControlStepId) => {
+      setWorkspaceMode("passport");
+      setActiveTab("crop");
+      closeOnCompact();
+      setTimeout(() => {
+        document
+          .getElementById("studio-workbench")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+        scrollToControlStep(stepId);
+      }, 90);
+    };
+
+    switch (action.id) {
+      case "open_passport":
+        setWorkspaceMode("passport");
+        setActiveTab("crop");
+        closeOnCompact();
+        scrollToWorkbench();
+        break;
+      case "open_sheet_preview":
+        setWorkspaceMode("passport");
+        setActiveTab("sheet");
+        closeOnCompact();
+        scrollToWorkbench();
+        break;
+      case "open_ai_beauty":
+        setWorkspaceMode("passport");
+        setActiveTab("crop");
+        closeOnCompact();
+        if (imageSrc) {
+          setIsAiBeautyModalOpen(true);
+        } else {
+          scrollToWorkbench();
+        }
+        break;
+      case "jump_size":
+        jumpPassportStep("size");
+        break;
+      case "jump_bg_cut":
+        jumpPassportStep("bg");
+        break;
+      case "jump_outfit":
+        jumpPassportStep("dress");
+        break;
+      case "jump_info":
+        jumpPassportStep("name");
+        break;
+      case "jump_export":
+        jumpPassportStep("export");
+        break;
+      case "open_xerox":
+        setWorkspaceMode("xerox");
+        closeOnCompact();
+        scrollToWorkbench();
+        break;
+      case "open_converters":
+        setWorkspaceMode("converters");
+        closeOnCompact();
+        scrollToWorkbench();
+        break;
+      case "open_resume":
+        setWorkspaceMode("resume");
+        closeOnCompact();
+        scrollToWorkbench();
+        break;
+      case "open_mail_desk":
+        handleOpenMailQuery(action.mailBody, action.mailSubject);
+        closeOnCompact();
+        break;
+    }
+  };
 
   if (isAdminRoute) {
     return (
@@ -3297,7 +3413,8 @@ export default function App() {
       />
 
       <StudioAiAgent
-        studioContext={studioContextSummary}
+        studioSnapshot={studioLiveSnapshot}
+        onTriggerAction={handleAssistantAction}
         isOpen={isAiOpen}
         onToggle={setIsAiOpen}
       />
