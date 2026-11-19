@@ -186,7 +186,7 @@ function getRadianAngle(degreeValue: number): number {
   return (degreeValue * Math.PI) / 180;
 }
 
-function rotateSize(width: number, height: number, rotation: number) {
+export function rotateSize(width: number, height: number, rotation: number) {
   const rotRad = getRadianAngle(rotation);
   return {
     width:
@@ -221,6 +221,7 @@ export function buildCanvasFilterString(
 export interface RenderPhotoOptions {
   imageSrc: string;
   croppedAreaPixels: Area;
+  croppedAreaPercent?: Area | null;
   outW: number;
   outH: number;
   bgColor: string;
@@ -249,6 +250,7 @@ export async function renderSinglePhotoCanvas(
   const {
     imageSrc,
     croppedAreaPixels,
+    croppedAreaPercent = null,
     outW,
     outH,
     bgColor,
@@ -272,12 +274,14 @@ export async function renderSinglePhotoCanvas(
   } = opts;
 
   const image = await loadHtmlImage(imageSrc);
+  const srcW = image.width;
+  const srcH = image.height;
 
   // Step 1: Rotate source image onto a temporary canvas matching react-easy-crop geometry
   const rotRad = getRadianAngle(rotation);
   const { width: bBoxWidth, height: bBoxHeight } = rotateSize(
-    image.width,
-    image.height,
+    srcW,
+    srcH,
     rotation
   );
 
@@ -288,7 +292,7 @@ export async function renderSinglePhotoCanvas(
 
   rotCtx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
   rotCtx.rotate(rotRad);
-  rotCtx.translate(-image.width / 2, -image.height / 2);
+  rotCtx.translate(-srcW / 2, -srcH / 2);
   rotCtx.filter = buildCanvasFilterString(brightness, contrast, imageFilter);
   rotCtx.drawImage(image, 0, 0);
 
@@ -326,18 +330,22 @@ export async function renderSinglePhotoCanvas(
     }
   }
 
+  // Compute exact crop rectangle (preferring resolution-independent percentages)
+  const cropX = croppedAreaPercent
+    ? (croppedAreaPercent.x / 100) * rotCanvas.width
+    : croppedAreaPixels.x;
+  const cropY = croppedAreaPercent
+    ? (croppedAreaPercent.y / 100) * rotCanvas.height
+    : croppedAreaPixels.y;
+  const cropW = croppedAreaPercent
+    ? (croppedAreaPercent.width / 100) * rotCanvas.width
+    : croppedAreaPixels.width;
+  const cropH = croppedAreaPercent
+    ? (croppedAreaPercent.height / 100) * rotCanvas.height
+    : croppedAreaPixels.height;
+
   // Draw cropped portion scaled cleanly to outW x outH
-  ctx.drawImage(
-    rotCanvas,
-    croppedAreaPixels.x,
-    croppedAreaPixels.y,
-    croppedAreaPixels.width,
-    croppedAreaPixels.height,
-    0,
-    0,
-    outW,
-    outH
-  );
+  ctx.drawImage(rotCanvas, cropX, cropY, cropW, cropH, 0, 0, outW, outH);
 
   // Step 2b: Optional Formal Passport Dress Overlay (built-in SVG or R2 PNG/WEBP)
   const resolvedDressUrl =

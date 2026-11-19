@@ -31,6 +31,7 @@ import {
   Undo2,
   Upload,
   Users,
+  Wand2,
 } from "lucide-react";
 import samplePortraitImg from "./assets/images/sample_portrait_1794641002441.jpg";
 import { CameraCaptureModal } from "./components/CameraCaptureModal";
@@ -44,6 +45,7 @@ import {
   ResponsiveHorizontalBanner,
   SocialBarAd,
 } from "./components/NativeAdBanner";
+import { AiSkinBeautyModal } from "./components/AiSkinBeautyModal";
 import { SheetPreviewCanvas } from "./components/SheetPreviewCanvas";
 import { StudioAiAgent } from "./components/StudioAiAgent";
 import { StudioSections } from "./components/StudioSections";
@@ -74,12 +76,14 @@ import {
 } from "./types/cms";
 import { fetchPublicBootstrap } from "./utils/adminApi";
 import {
+  AiSkinBeautyOptions,
   BG_COLORS,
   BORDER_COLOR_PRESETS,
   BRAND_ICON_URL,
   BRAND_NAME,
   OFFICIAL_SITE_URL,
   OFFICIAL_SUPPORT_EMAIL,
+  DEFAULT_AI_SKIN_BEAUTY_OPTIONS,
   DEFAULT_SUPPORT_EMAIL,
   DRESS_PRESETS,
   DressStyleId,
@@ -111,6 +115,8 @@ import {
   setJpegPpi,
   triggerBlobDownload,
 } from "./utils/imageProcessing";
+import { processOnDeviceAiSkinBeauty } from "./utils/skinRetouch";
+import { useTouchScrollIsolation } from "./utils/useTouchScrollIsolation";
 import { useUndoRedo } from "./utils/useUndoRedo";
 
 type StudioTab = "crop" | "sheet";
@@ -148,6 +154,9 @@ interface PassportStudioState {
   brightness: number;
   contrast: number;
   imageFilter: ImageFilterKey;
+  aiBeautyApplied: boolean;
+  preBeautySrc: string | null;
+  aiBeautyFile: Blob | null;
   showHeadGuide: boolean;
   bgColor: string;
   bgImageUrl: string | null;
@@ -186,6 +195,9 @@ const INITIAL_PASSPORT_STUDIO_STATE: PassportStudioState = {
   brightness: 100,
   contrast: 100,
   imageFilter: "none",
+  aiBeautyApplied: false,
+  preBeautySrc: null,
+  aiBeautyFile: null,
   showHeadGuide: true,
   bgColor: "#FFFFFF",
   bgImageUrl: null,
@@ -286,6 +298,9 @@ export default function App() {
     brightness,
     contrast,
     imageFilter,
+    aiBeautyApplied,
+    preBeautySrc,
+    aiBeautyFile,
     showHeadGuide,
     bgColor,
     bgImageUrl,
@@ -391,6 +406,16 @@ export default function App() {
   const [isBulkUploading, setIsBulkUploading] = useState<boolean>(false);
 
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+  const [croppedAreaPercent, setCroppedAreaPercent] = useState<Area | null>(null);
+
+  // AI Skin Beauty Modal & Hold-to-Compare State (Zero-API-Key On-Device)
+  const [isComparingOriginal, setIsComparingOriginal] = useState(false);
+  const [aiBeautyOptions, setAiBeautyOptions] = useState<AiSkinBeautyOptions>(
+    DEFAULT_AI_SKIN_BEAUTY_OPTIONS
+  );
+  const [isAiBeautyModalOpen, setIsAiBeautyModalOpen] = useState(false);
+  const [isApplyingAiBeauty, setIsApplyingAiBeauty] = useState(false);
+  const [aiBeautyStatusText, setAiBeautyStatusText] = useState("");
 
   // Async Status & Feedback
   const [isRemovingBg, setIsRemovingBg] = useState(false);
@@ -514,9 +539,21 @@ export default function App() {
     { id: "name", label: "04–05 Info" },
     { id: "export", label: "Export" },
   ];
+  const leftColumnRef = useRef<HTMLDivElement | null>(null);
   const rightPanelRef = useRef<HTMLDivElement | null>(null);
   const [activeControlStep, setActiveControlStep] =
     useState<ControlStepId>("size");
+
+  // Isolate mobile touch gestures strictly within both Left and Right studio panels
+  const isPassportWorkbenchMounted = !isAdminRoute && workspaceMode === "passport";
+  useTouchScrollIsolation(leftColumnRef, {
+    enabled: isPassportWorkbenchMounted,
+    allowInnerScroll: true,
+  });
+  useTouchScrollIsolation(rightPanelRef, {
+    enabled: isPassportWorkbenchMounted,
+    allowInnerScroll: true,
+  });
 
   const scrollToControlStep = (stepId: ControlStepId) => {
     setActiveControlStep(stepId);
@@ -688,6 +725,9 @@ export default function App() {
         originalSrc: url,
         imageSrc: url,
         bgRemoved: false,
+        aiBeautyApplied: false,
+        preBeautySrc: null,
+        aiBeautyFile: null,
         zoom: 1,
         rotation: 0,
         brightness: 100,
@@ -695,6 +735,7 @@ export default function App() {
         imageFilter: "none",
         crop: { x: 0, y: 0 },
       });
+      setIsComparingOriginal(false);
       setErrorMessage(null);
       setExportMessage(null);
       setActiveTab("crop");
@@ -770,7 +811,8 @@ export default function App() {
     }
   };
 
-  const onCropComplete = useCallback((_: Area, croppedPixels: Area) => {
+  const onCropComplete = useCallback((croppedArea: Area, croppedPixels: Area) => {
+    setCroppedAreaPercent(croppedArea);
     setCroppedAreaPixels(croppedPixels);
   }, []);
 
@@ -863,6 +905,7 @@ export default function App() {
         const canvas = await renderSinglePhotoCanvas({
           imageSrc,
           croppedAreaPixels,
+          croppedAreaPercent,
           outW: activeDims.printW,
           outH: activeDims.printH,
           bgColor,
@@ -896,6 +939,7 @@ export default function App() {
     sheetQueue.length,
     imageSrc,
     croppedAreaPixels,
+    croppedAreaPercent,
     activeDims.printW,
     activeDims.printH,
     bgColor,
@@ -993,6 +1037,7 @@ export default function App() {
       const canvas = await renderSinglePhotoCanvas({
         imageSrc,
         croppedAreaPixels,
+        croppedAreaPercent,
         outW: activeDims.printW,
         outH: activeDims.printH,
         bgColor,
@@ -1064,6 +1109,9 @@ export default function App() {
       originalFile: item.sourceFile || null,
       imageSrc: item.sourceUrl,
       bgRemoved: false,
+      aiBeautyApplied: false,
+      preBeautySrc: null,
+      aiBeautyFile: null,
       zoom: 1,
       rotation: 0,
       brightness: 100,
@@ -1071,6 +1119,7 @@ export default function App() {
       imageFilter: "none",
       crop: { x: 0, y: 0 },
     });
+    setIsComparingOriginal(false);
     setCopiesToAdd(item.copies);
     setEditingQueueId(item.id);
     setActiveTab("crop");
@@ -1090,16 +1139,17 @@ export default function App() {
     setSheetQueue((prev) => prev.filter((item) => item.id !== id));
   };
 
-  // Client-Side AI Background Removal
+  // Client-Side AI Background Removal (preserves AI Skin Beauty if applied first)
   const handleRemoveBackground = async () => {
-    if (!originalFile) return;
+    const sourceBlob = aiBeautyApplied && aiBeautyFile ? aiBeautyFile : originalFile;
+    if (!sourceBlob) return;
     try {
       setErrorMessage(null);
       setIsRemovingBg(true);
       setBgStatusText("Preparing AI model...");
       const { removeBackground } = await import("@imgly/background-removal");
 
-      const transparentBlob = await removeBackground(originalFile, {
+      const transparentBlob = await removeBackground(sourceBlob, {
         progress: (_key: string, current: number, total: number) => {
           if (total > 0) {
             const pct = Math.min(100, Math.round((current / total) * 100));
@@ -1112,6 +1162,8 @@ export default function App() {
       patchStudio({
         imageSrc: newUrl,
         bgRemoved: true,
+        preBeautySrc: null,
+        aiBeautyFile: aiBeautyApplied ? transparentBlob : null,
       });
       setBgStatusText("");
     } catch (err) {
@@ -1124,12 +1176,60 @@ export default function App() {
     }
   };
 
+  // Zero-API-Key On-Device AI Skin Beauty & Pimple Removal
+  const handleApplyAiSkinBeauty = async (chosenOptions: AiSkinBeautyOptions) => {
+    const baseSrc = preBeautySrc || imageSrc;
+    if (!baseSrc) return;
+    try {
+      setAiBeautyOptions(chosenOptions);
+      setErrorMessage(null);
+      setIsApplyingAiBeauty(true);
+      setAiBeautyStatusText("Analyzing skin tone (10%)");
+
+      const img = await loadHtmlImage(baseSrc);
+      const retouchedBlob = await processOnDeviceAiSkinBeauty(
+        img,
+        chosenOptions,
+        bgRemoved,
+        (_pct, stageLabel) => {
+          setAiBeautyStatusText(stageLabel);
+        }
+      );
+
+      const nextUrl = URL.createObjectURL(retouchedBlob);
+      patchStudio({
+        imageSrc: nextUrl,
+        aiBeautyApplied: true,
+        preBeautySrc: baseSrc,
+        aiBeautyFile: retouchedBlob,
+      });
+      setIsComparingOriginal(false);
+      setIsAiBeautyModalOpen(false);
+      setAiBeautyStatusText("");
+      setExportMessage(
+        "AI Skin Beauty applied cleanly. Hold Before / After to compare or download at 300 PPI."
+      );
+    } catch (err) {
+      console.error(err);
+      setErrorMessage(
+        "AI Skin Beauty could not complete on this image. Please try again."
+      );
+    } finally {
+      setIsApplyingAiBeauty(false);
+      setAiBeautyStatusText("");
+    }
+  };
+
   const handleRestoreOriginal = () => {
     if (!originalSrc) return;
     patchStudio({
       imageSrc: originalSrc,
       bgRemoved: false,
+      aiBeautyApplied: false,
+      preBeautySrc: null,
+      aiBeautyFile: null,
     });
+    setIsComparingOriginal(false);
     setErrorMessage(null);
   };
 
@@ -1146,6 +1246,7 @@ export default function App() {
       const canvas = await renderSinglePhotoCanvas({
         imageSrc,
         croppedAreaPixels,
+        croppedAreaPercent,
         outW: activeDims.w,
         outH: activeDims.h,
         bgColor,
@@ -1212,6 +1313,7 @@ export default function App() {
         singleCanvas = await renderSinglePhotoCanvas({
           imageSrc,
           croppedAreaPixels,
+          croppedAreaPercent,
           outW: activeDims.printW,
           outH: activeDims.printH,
           bgColor,
@@ -1410,7 +1512,7 @@ export default function App() {
         {/* Interactive 300 PPI Print Studio Workbench */}
         <section
           id="studio-workbench"
-          className="studio-dark-shell max-w-7xl w-full mx-auto px-3 sm:px-6 pt-8 sm:pt-10 pb-6"
+          className="studio-dark-shell max-w-7xl w-full mx-auto px-2 sm:px-4 lg:px-6 pt-6 sm:pt-10 pb-6"
         >
           {/* Compact Centered Workspace Mode Switcher */}
           <div className="mb-6 sm:mb-7 max-w-4xl mx-auto">
@@ -1503,22 +1605,32 @@ export default function App() {
             </Suspense>
           ) : (
           <>
-          {/* Main Two-Column Studio Workbench (Side-by-Side on Desktop, Split Top/Bottom on Mobile & Tablet) */}
+          {/* Main Two-Column Studio Workbench (Always Side-by-Side on All Screen Sizes; Selected Photo Stays Pinned) */}
           <div
             id="studio"
-            className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-4 lg:gap-6 items-start"
+            className="grid grid-cols-12 gap-2 sm:gap-4 lg:gap-6 items-start"
           >
-            {/* Left / Top 7 Columns: Pinned Interactive Cropper, Live Sheet Preview & Multi-Photo Queue */}
-            <div className="lg:col-span-7 min-w-0 space-y-3 sm:space-y-4 lg:space-y-5 max-h-[43vh] sm:max-h-[46vh] lg:max-h-[calc(100vh-5.75rem)] overflow-y-auto studio-panel-scroll lg:sticky lg:top-20 pr-0.5 lg:pr-1">
-              <div className="glass-card p-3 sm:p-4 lg:p-5">
+            {/* Left 7 Columns: Pinned Selected Photo Stage + Independent-Scroll Lower Tools & Queue */}
+            <div
+              ref={leftColumnRef}
+              className="col-span-7 min-w-0 flex flex-col gap-2.5 sm:gap-3.5 h-[calc(100dvh-4.75rem)] sm:h-[calc(100vh-5.75rem)] sticky top-16 sm:top-20 pr-0.5 lg:pr-1 overscroll-contain"
+            >
+              {/* Pinned Top Stage (Does Not Scroll Away When Scrolling Tools Below or Right Panel) */}
+              <div
+                className={`glass-card p-2 sm:p-3.5 lg:p-4 shrink-0 overscroll-contain ${
+                  activeTab === "sheet" || !imageSrc
+                    ? "max-h-[62%] overflow-y-auto overflow-x-hidden studio-panel-scroll"
+                    : ""
+                }`}
+              >
                 {/* Workspace Toolbar */}
-                <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-[#00E5FF]/15">
-                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                    <div className="grid grid-cols-2 sm:inline-flex items-center gap-1 p-1 bg-[#080B12] border border-[#00E5FF]/20 rounded-xl flex-1 sm:flex-initial">
+                <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center justify-between gap-2 sm:gap-2.5 pb-2.5 sm:pb-3 mb-2.5 sm:mb-3 border-b border-[#00E5FF]/15">
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full sm:w-auto min-w-0">
+                    <div className="grid grid-cols-2 sm:inline-flex items-center gap-1 p-1 bg-[#080B12] border border-[#00E5FF]/20 rounded-xl flex-1 sm:flex-initial min-w-0">
                       <button
                         type="button"
                         onClick={() => setActiveTab("crop")}
-                        className={`inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                        className={`inline-flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 text-[11px] sm:text-xs font-semibold rounded-lg transition-colors whitespace-nowrap min-w-0 cursor-pointer ${
                           activeTab === "crop"
                             ? "bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12] shadow-sm"
                             : "text-[#94A3B8] hover:text-[#F5F7FA]"
@@ -1531,16 +1643,15 @@ export default function App() {
                         type="button"
                         id="sheet-layout"
                         onClick={() => setActiveTab("sheet")}
-                        className={`inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                        className={`inline-flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 text-[11px] sm:text-xs font-semibold rounded-lg transition-colors whitespace-nowrap min-w-0 cursor-pointer ${
                           activeTab === "sheet"
                             ? "bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12] shadow-sm"
                             : "text-[#94A3B8] hover:text-[#F5F7FA]"
                         }`}
                       >
-                        <Grid className="w-3.5 h-3.5" />
+                        <Grid className="w-3.5 h-3.5 shrink-0" />
                         <span className="truncate">
-                          Sheet Preview ({effectiveSheetCount} on{" "}
-                          {paper.shortLabel})
+                          Sheet ({effectiveSheetCount} · {paper.shortLabel})
                         </span>
                       </button>
                     </div>
@@ -1585,18 +1696,51 @@ export default function App() {
                   {imageSrc && (
                     <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
                       {activeTab === "crop" && (
-                        <button
-                          type="button"
-                          onClick={() => setShowHeadGuide((v) => !v)}
-                          className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                            showHeadGuide
-                              ? "border-[#00E5FF]/60 bg-[#00E5FF]/15 text-[#00E5FF]"
-                              : "border-[#00E5FF]/20 text-[#94A3B8] hover:text-[#F5F7FA]"
-                          }`}
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>Head Guide</span>
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            disabled={!aiBeautyApplied && !bgRemoved}
+                            onPointerDown={() => setIsComparingOriginal(true)}
+                            onPointerUp={() => setIsComparingOriginal(false)}
+                            onPointerLeave={() => setIsComparingOriginal(false)}
+                            onPointerCancel={() => setIsComparingOriginal(false)}
+                            onKeyDown={(e) => {
+                              if (e.key === " " || e.key === "Enter") {
+                                setIsComparingOriginal(true);
+                              }
+                            }}
+                            onKeyUp={() => setIsComparingOriginal(false)}
+                            onBlur={() => setIsComparingOriginal(false)}
+                            title="Press and hold to compare with the unretouched original photo"
+                            className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap shrink-0 select-none ${
+                              isComparingOriginal
+                                ? "border-[#00E5FF] bg-[#00E5FF] text-[#080B12] cursor-pointer"
+                                : aiBeautyApplied || bgRemoved
+                                ? "border-[#00E5FF]/50 bg-[#00E5FF]/10 text-[#F5F7FA] hover:border-[#00E5FF] cursor-pointer"
+                                : "border-[#00E5FF]/15 text-slate-500 cursor-not-allowed"
+                            }`}
+                          >
+                            <ArrowLeftRight className="w-3.5 h-3.5" />
+                            <span>
+                              {isComparingOriginal
+                                ? "Showing Original"
+                                : "Hold: Before / After"}
+                            </span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setShowHeadGuide((v) => !v)}
+                            className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                              showHeadGuide
+                                ? "border-[#00E5FF]/60 bg-[#00E5FF]/15 text-[#00E5FF]"
+                                : "border-[#00E5FF]/20 text-[#94A3B8] hover:text-[#F5F7FA]"
+                            }`}
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Head Guide</span>
+                          </button>
+                        </>
                       )}
 
                       <button
@@ -1723,10 +1867,10 @@ export default function App() {
                   </div>
                 ) : (
                   <div>
-                    {/* Interactive Crop Frame */}
+                    {/* Interactive Crop Frame (Locked in View Above Scrollable Controls) */}
                     <div
                       ref={cropContainerRef}
-                      className="relative w-full h-[230px] sm:h-[290px] lg:h-[370px] rounded-xl overflow-hidden border border-[#00E5FF]/25"
+                      className="relative w-full h-[180px] sm:h-[235px] lg:h-[300px] xl:h-[340px] rounded-xl overflow-hidden border border-[#00E5FF]/25 touch-none"
                       style={{
                         backgroundColor: bgColor,
                         backgroundImage: bgImageUrl ? `url("${bgImageUrl}")` : undefined,
@@ -1745,12 +1889,18 @@ export default function App() {
                         }}
                       >
                         <Cropper
-                          image={imageSrc}
+                          image={
+                            isComparingOriginal
+                              ? preBeautySrc || originalSrc || imageSrc
+                              : imageSrc
+                          }
                           crop={crop}
                           zoom={zoom}
                           rotation={rotation}
                           aspect={activeDims.aspect}
                           cropSize={cropBoxSize}
+                          showGrid={true}
+                          zoomWithScroll={false}
                           onCropChange={setCrop}
                           onZoomChange={setZoom}
                           onRotationChange={setRotation}
@@ -1823,10 +1973,24 @@ export default function App() {
                           />
                         </svg>
                       )}
-                    </div>
 
+                      {/* Active Comparison Indicator */}
+                      {isComparingOriginal && (
+                        <div className="pointer-events-none absolute top-3 left-3 z-30 px-2.5 py-1 rounded-md bg-[#080B12]/90 border border-[#00E5FF]/50 text-[11px] font-semibold text-[#00E5FF]">
+                          Original (Before)
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Independent Scrollable Lower Tools & Multi-Photo Queue (Scrolls Without Moving Selected Photo Above) */}
+              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain studio-panel-scroll space-y-2.5 sm:space-y-3.5 pr-0.5">
+                {activeTab === "crop" && imageSrc && (
+                  <div className="glass-card p-2 sm:p-3.5 lg:p-4">
                     {/* Fine-Tune Sliders */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 mt-4 pt-4 border-t border-[#00E5FF]/15">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 lg:gap-x-6 gap-y-2.5 sm:gap-y-3">
                       <div>
                         <div className="flex justify-between text-xs text-[#94A3B8] mb-1">
                           <span className="font-medium text-[#E2E8F0]">Zoom</span>
@@ -1930,7 +2094,7 @@ export default function App() {
                         )}
                       </div>
 
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-1.5 sm:gap-2">
                         {IMAGE_FILTER_PRESETS.map((preset) => {
                           const isActive = imageFilter === preset.id;
                           return (
@@ -1971,14 +2135,15 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* AI Background Removal & Add to Multi-Photo Queue Bar */}
-                    <div className="mt-4 pt-4 border-t border-[#00E5FF]/15 flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        {bgRemoved && (
+                    {/* AI Background Removal, AI Skin Beauty & Add to Multi-Photo Queue Bar */}
+                    <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-[#00E5FF]/15 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                        {(bgRemoved || aiBeautyApplied) && (
                           <button
                             type="button"
                             onClick={handleRestoreOriginal}
-                            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#F5F7FA] bg-[#161D2B] border border-[#00E5FF]/20 hover:border-[#00E5FF]/50 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                            disabled={isRemovingBg || isApplyingAiBeauty}
+                            className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold text-[#F5F7FA] bg-[#161D2B] border border-[#00E5FF]/20 hover:border-[#00E5FF]/50 disabled:opacity-50 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
                             <span>Restore Original</span>
@@ -1988,8 +2153,8 @@ export default function App() {
                         <button
                           type="button"
                           onClick={handleRemoveBackground}
-                          disabled={isRemovingBg}
-                          className="inline-flex items-center gap-2 bg-[#161D2B] border border-[#00E5FF]/35 hover:border-[#00E5FF] disabled:opacity-50 text-[#F5F7FA] text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                          disabled={isRemovingBg || isApplyingAiBeauty}
+                          className="inline-flex items-center gap-1.5 sm:gap-2 bg-[#161D2B] border border-[#00E5FF]/35 hover:border-[#00E5FF] disabled:opacity-50 text-[#F5F7FA] text-[11px] sm:text-xs font-semibold px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                         >
                           {isRemovingBg ? (
                             <>
@@ -2005,13 +2170,40 @@ export default function App() {
                             </>
                           )}
                         </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setIsAiBeautyModalOpen(true)}
+                          disabled={isApplyingAiBeauty || isRemovingBg}
+                          className={`inline-flex items-center gap-1.5 sm:gap-2 border disabled:opacity-50 text-[11px] sm:text-xs font-semibold px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                            aiBeautyApplied
+                              ? "bg-[#00E5FF]/15 border-[#00E5FF] text-[#F5F7FA] hover:bg-[#00E5FF]/25"
+                              : "bg-[#161D2B] border-[#8B5CF6]/55 hover:border-[#00E5FF] text-[#F5F7FA]"
+                          }`}
+                        >
+                          {isApplyingAiBeauty ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#00E5FF]" />
+                              <span>{aiBeautyStatusText || "Retouching..."}</span>
+                            </>
+                          ) : (
+                            <>
+                              <Wand2 className="w-3.5 h-3.5 text-[#00E5FF]" />
+                              <span>
+                                {aiBeautyApplied
+                                  ? "AI Skin Beauty (Edit)"
+                                  : "AI Skin Beauty"}
+                              </span>
+                            </>
+                          )}
+                        </button>
                       </div>
 
                       {/* Add Current Photo to Multi-Photo Sheet */}
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                         <label
                           htmlFor="copies-to-add"
-                          className="text-xs text-[#94A3B8] whitespace-nowrap"
+                          className="text-[11px] sm:text-xs text-[#94A3B8] whitespace-nowrap"
                         >
                           Copies:
                         </label>
@@ -2024,12 +2216,12 @@ export default function App() {
                           onChange={(e) =>
                             setCopiesToAdd(Math.max(1, Number(e.target.value)))
                           }
-                          className="w-14 font-mono-nums bg-[#080B12] border border-[#00E5FF]/25 rounded-lg px-2 py-1.5 text-xs text-center text-[#F5F7FA] focus:outline-none focus:ring-2 focus:ring-[#00E5FF]"
+                          className="w-12 sm:w-14 font-mono-nums bg-[#080B12] border border-[#00E5FF]/25 rounded-lg px-1.5 sm:px-2 py-1.5 text-xs text-center text-[#F5F7FA] focus:outline-none focus:ring-2 focus:ring-[#00E5FF]"
                         />
                         <button
                           type="button"
                           onClick={handleAddToQueue}
-                          className="inline-flex items-center gap-1.5 bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12] font-bold text-xs px-3.5 py-2 rounded-lg hover:brightness-110 transition-all whitespace-nowrap shrink-0 cursor-pointer"
+                          className="inline-flex items-center gap-1.5 bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12] font-bold text-[11px] sm:text-xs px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg hover:brightness-110 transition-all whitespace-nowrap shrink-0 cursor-pointer"
                         >
                           <Plus className="w-3.5 h-3.5" />
                           <span>
@@ -2042,10 +2234,9 @@ export default function App() {
                     </div>
                   </div>
                 )}
-              </div>
 
-              {/* Multi-Photo Sheet Queue Panel */}
-              <div className="glass-card p-3 sm:p-4 lg:p-5">
+                {/* Multi-Photo Sheet Queue Panel */}
+                <div className="glass-card p-2 sm:p-3.5 lg:p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 mb-2 sm:mb-3">
                   <div className="flex items-center gap-2">
                     <Users className="w-4 h-4 text-[#00E5FF] shrink-0" />
@@ -2141,7 +2332,7 @@ export default function App() {
                       </div>
                     )}
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
                       {sheetQueue.map((item, idx) => (
                         <div
                           key={item.id}
@@ -2247,17 +2438,18 @@ export default function App() {
                     </div>
                   </div>
                 )}
+                </div>
               </div>
             </div>
 
-            {/* Right / Bottom 5 Columns: Scrollable Configuration & Export Controls */}
+            {/* Right 5 Columns: Independent-Scroll Configuration & Export Controls */}
             <div
               ref={rightPanelRef}
               onScroll={handleRightPanelScroll}
-              className="lg:col-span-5 min-w-0 glass-card p-3.5 sm:p-5 space-y-4 sm:space-y-5 max-h-[46vh] sm:max-h-[48vh] lg:max-h-[calc(100vh-5.75rem)] overflow-y-auto studio-panel-scroll lg:sticky lg:top-20"
+              className="col-span-5 min-w-0 glass-card p-2 sm:p-4 lg:p-5 space-y-3 sm:space-y-4 lg:space-y-5 h-[calc(100dvh-4.75rem)] sm:h-[calc(100vh-5.75rem)] overflow-y-auto overflow-x-hidden overscroll-contain studio-panel-scroll sticky top-16 sm:top-20"
             >
             {/* Sticky Quick-Step Next-by-Next Bar */}
-            <div className="sticky top-0 z-20 -mx-3.5 sm:-mx-5 -mt-3.5 sm:-mt-5 px-3 sm:px-4 py-2 sm:py-2.5 bg-[#0D131F]/95 backdrop-blur-xl border-b border-[#00E5FF]/20 rounded-t-[20px] flex items-center justify-between gap-2">
+            <div className="sticky top-0 z-20 -mx-2 sm:-mx-4 lg:-mx-5 -mt-2 sm:-mt-4 lg:-mt-5 px-2 sm:px-4 py-1.5 sm:py-2.5 bg-[#0D131F]/95 backdrop-blur-xl border-b border-[#00E5FF]/20 rounded-t-[20px] flex items-center justify-between gap-1.5 sm:gap-2">
               <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
                 {STUDIO_CONTROL_STEPS.map((step) => {
                   const isActive = activeControlStep === step.id;
@@ -2376,7 +2568,7 @@ export default function App() {
 
             {/* 2. Paper Size, Orientation, Custom Photo Count & Uniform Gap */}
             <div className="space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5 sm:gap-3">
                 <div>
                   <label
                     htmlFor="paper-select"
@@ -2453,11 +2645,11 @@ export default function App() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 p-1 bg-[#080B12] border border-[#00E5FF]/20 rounded-lg">
+                    <div className="grid grid-cols-2 xl:grid-cols-4 gap-1 p-1 bg-[#080B12] border border-[#00E5FF]/20 rounded-lg">
                       <button
                         type="button"
                         onClick={() => setCountMode("max")}
-                        className={`px-2 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap ${
+                        className={`px-1.5 sm:px-2 py-1.5 text-[11px] sm:text-xs font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap truncate ${
                           countMode === "max"
                             ? "bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12]"
                             : "text-[#94A3B8] hover:text-[#F5F7FA]"
@@ -2471,7 +2663,7 @@ export default function App() {
                           setCountMode("line1");
                           setCustomPhotoCount(baseLayout.cols);
                         }}
-                        className={`px-2 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap ${
+                        className={`px-1.5 sm:px-2 py-1.5 text-[11px] sm:text-xs font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap truncate ${
                           countMode === "line1"
                             ? "bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12]"
                             : "text-[#94A3B8] hover:text-[#F5F7FA]"
@@ -2489,7 +2681,7 @@ export default function App() {
                           setCountMode("line2");
                           setCustomPhotoCount(twoLines);
                         }}
-                        className={`px-2 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap ${
+                        className={`px-1.5 sm:px-2 py-1.5 text-[11px] sm:text-xs font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap truncate ${
                           countMode === "line2"
                             ? "bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12]"
                             : "text-[#94A3B8] hover:text-[#F5F7FA]"
@@ -2501,7 +2693,7 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => setCountMode("custom")}
-                        className={`px-2 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap ${
+                        className={`px-1.5 sm:px-2 py-1.5 text-[11px] sm:text-xs font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap truncate ${
                           countMode === "custom"
                             ? "bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12]"
                             : "text-[#94A3B8] hover:text-[#F5F7FA]"
@@ -2511,7 +2703,7 @@ export default function App() {
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-1.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-1.5">
                       {[1, 2, 3].map((rowCount) => (
                         <button
                           key={rowCount}
@@ -2597,7 +2789,7 @@ export default function App() {
                 </label>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-1.5 sm:gap-2">
                 {resolvedBackgrounds.map((bg) => {
                   const isImage = bg.preset_type === "image" && bg.image_url;
                   const hex = (bg.hex_color || "#FFFFFF").toUpperCase();
@@ -2652,7 +2844,7 @@ export default function App() {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-5 gap-1">
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-1">
                   {[0, 2, 4, 6, 10].map((px) => (
                     <button
                       key={px}
@@ -2675,7 +2867,7 @@ export default function App() {
                       key={st.id}
                       type="button"
                       onClick={() => setOutlineStyle(st.id)}
-                      className={`py-1 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
+                      className={`py-1 text-[11px] sm:text-xs font-semibold rounded-md transition-colors cursor-pointer truncate ${
                         outlineStyle === st.id
                           ? "bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12]"
                           : "text-[#94A3B8] hover:text-[#F5F7FA]"
@@ -2686,7 +2878,7 @@ export default function App() {
                   ))}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5 sm:gap-3">
                   <div>
                     <div className="flex justify-between text-[11px] text-[#94A3B8] mb-0.5">
                       <span>Outline Thickness</span>
@@ -2729,8 +2921,8 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                  <div className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <span className="text-xs text-[#94A3B8] mr-1">Color:</span>
                     {BORDER_COLOR_PRESETS.map((c) => (
                       <button
@@ -2794,7 +2986,7 @@ export default function App() {
               </div>
 
               {/* Category Filter */}
-              <div className="grid grid-cols-4 sm:grid-cols-7 gap-1 p-1 bg-[#080B12] border border-[#00E5FF]/20 rounded-lg">
+              <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-1 p-1 bg-[#080B12] border border-[#00E5FF]/20 rounded-lg">
                 {(
                   [
                     "All",
@@ -2810,7 +3002,7 @@ export default function App() {
                     key={cat}
                     type="button"
                     onClick={() => setDressCategory(cat)}
-                    className={`px-1.5 py-1.5 text-[11px] font-semibold rounded-md transition-colors cursor-pointer text-center ${
+                    className={`px-1 py-1.5 text-[10px] sm:text-[11px] font-semibold rounded-md transition-colors cursor-pointer text-center truncate ${
                       dressCategory === cat
                         ? "bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12]"
                         : "text-[#94A3B8] hover:text-[#F5F7FA]"
@@ -2822,7 +3014,7 @@ export default function App() {
               </div>
 
               {/* Visual Outfit Thumbnail Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-56 overflow-y-auto pr-0.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-1.5 max-h-56 overflow-y-auto pr-0.5">
                 {filteredDresses.map((d) => {
                   const thumbUrl =
                     d.customUrl ||
@@ -2861,7 +3053,7 @@ export default function App() {
               </div>
 
               {dressId !== "none" && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 bg-[#080B12]/75 border border-[#00E5FF]/20 rounded-lg p-2.5">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5 pt-1 bg-[#080B12]/75 border border-[#00E5FF]/20 rounded-lg p-2.5">
                   <div>
                     <div className="flex justify-between text-[11px] text-[#94A3B8] mb-0.5">
                       <span>Size</span>
@@ -2922,20 +3114,20 @@ export default function App() {
               <label className="block text-xs font-semibold text-[#E2E8F0] mb-1.5">
                 04. Name &amp; Date Strip (Optional for Govt Exams)
               </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-2.5">
                 <input
                   type="text"
                   placeholder="Candidate Name"
                   value={nameText}
                   onChange={(e) => setNameText(e.target.value)}
-                  className="bg-[#080B12] border border-[#00E5FF]/25 rounded-lg px-3 py-2 text-sm text-[#F5F7FA] focus:outline-none focus:ring-2 focus:ring-[#00E5FF]"
+                  className="w-full min-w-0 bg-[#080B12] border border-[#00E5FF]/25 rounded-lg px-2.5 sm:px-3 py-2 text-xs sm:text-sm text-[#F5F7FA] focus:outline-none focus:ring-2 focus:ring-[#00E5FF]"
                 />
                 <input
                   type="text"
                   placeholder="DOP: 14-11-2026"
                   value={dateText}
                   onChange={(e) => setDateText(e.target.value)}
-                  className="bg-[#080B12] border border-[#00E5FF]/25 rounded-lg px-3 py-2 text-sm text-[#F5F7FA] focus:outline-none focus:ring-2 focus:ring-[#00E5FF]"
+                  className="w-full min-w-0 bg-[#080B12] border border-[#00E5FF]/25 rounded-lg px-2.5 sm:px-3 py-2 text-xs sm:text-sm text-[#F5F7FA] focus:outline-none focus:ring-2 focus:ring-[#00E5FF]"
                 />
               </div>
             </div>
@@ -2978,12 +3170,12 @@ export default function App() {
             )}
 
             {/* Primary Export & Order Buttons */}
-            <div id="studio-step-export" className="pt-2 border-t border-[#00E5FF]/15 space-y-2.5 scroll-mt-14">
+            <div id="studio-step-export" className="pt-2 border-t border-[#00E5FF]/15 space-y-2 sm:space-y-2.5 scroll-mt-14">
               <button
                 type="button"
                 onClick={handleDownloadSingle}
                 disabled={!imageSrc || isExporting}
-                className={`w-full flex items-center justify-center gap-2 disabled:opacity-40 font-bold py-2.5 px-4 rounded-xl transition-all whitespace-nowrap cursor-pointer disabled:cursor-not-allowed ${activeTheme.primaryBtn}`}
+                className={`w-full flex items-center justify-center gap-1.5 sm:gap-2 disabled:opacity-40 font-bold text-xs sm:text-sm py-2 sm:py-2.5 px-2.5 sm:px-4 rounded-xl transition-all whitespace-nowrap cursor-pointer disabled:cursor-not-allowed ${activeTheme.primaryBtn}`}
               >
                 <ImageIcon className="w-4 h-4 shrink-0" />
                 <span className="truncate">
@@ -2995,7 +3187,7 @@ export default function App() {
                 type="button"
                 onClick={() => handleDownloadSheet(paperKey)}
                 disabled={!canExportSheet || isExporting}
-                className="w-full flex items-center justify-center gap-2 bg-[#161D2B] border border-[#00E5FF]/35 hover:border-[#00E5FF] disabled:opacity-40 text-[#F5F7FA] font-semibold py-2.5 px-4 rounded-xl transition-colors whitespace-nowrap cursor-pointer disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-center gap-1.5 sm:gap-2 bg-[#161D2B] border border-[#00E5FF]/35 hover:border-[#00E5FF] disabled:opacity-40 text-[#F5F7FA] font-semibold text-xs sm:text-sm py-2 sm:py-2.5 px-2.5 sm:px-4 rounded-xl transition-colors whitespace-nowrap cursor-pointer disabled:cursor-not-allowed"
               >
                 <Grid className="w-4 h-4 shrink-0 text-[#00E5FF]" />
                 <span className="truncate">
@@ -3004,34 +3196,34 @@ export default function App() {
                 </span>
               </button>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => handleDownloadSheet("4x6")}
                   disabled={!canExportSheet || isExporting}
-                  className="flex items-center justify-center gap-1.5 bg-[#080B12] border border-[#00E5FF]/20 hover:border-[#00E5FF]/60 disabled:opacity-40 text-[#E2E8F0] text-xs font-semibold py-2 px-3 rounded-lg transition-colors whitespace-nowrap cursor-pointer disabled:cursor-not-allowed"
+                  className="flex items-center justify-center gap-1.5 bg-[#080B12] border border-[#00E5FF]/20 hover:border-[#00E5FF]/60 disabled:opacity-40 text-[#E2E8F0] text-xs font-semibold py-2 px-2.5 sm:px-3 rounded-lg transition-colors whitespace-nowrap cursor-pointer disabled:cursor-not-allowed min-w-0"
                 >
                   <Download className="w-3.5 h-3.5 shrink-0 text-[#00E5FF]" />
-                  <span>Quick 4×6 Sheet</span>
+                  <span className="truncate">Quick 4×6 Sheet</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => handleDownloadSheet("a4")}
                   disabled={!canExportSheet || isExporting}
-                  className="flex items-center justify-center gap-1.5 bg-[#080B12] border border-[#00E5FF]/20 hover:border-[#00E5FF]/60 disabled:opacity-40 text-[#E2E8F0] text-xs font-semibold py-2 px-3 rounded-lg transition-colors whitespace-nowrap cursor-pointer disabled:cursor-not-allowed"
+                  className="flex items-center justify-center gap-1.5 bg-[#080B12] border border-[#00E5FF]/20 hover:border-[#00E5FF]/60 disabled:opacity-40 text-[#E2E8F0] text-xs font-semibold py-2 px-2.5 sm:px-3 rounded-lg transition-colors whitespace-nowrap cursor-pointer disabled:cursor-not-allowed min-w-0"
                 >
                   <Download className="w-3.5 h-3.5 shrink-0 text-[#00E5FF]" />
-                  <span>Quick A4 Sheet</span>
+                  <span className="truncate">Quick A4 Sheet</span>
                 </button>
               </div>
 
               <button
                 type="button"
                 onClick={() => handleOpenMailQuery()}
-                className="w-full flex items-center justify-center gap-2 border border-[#8B5CF6]/40 bg-[#8B5CF6]/10 hover:bg-[#8B5CF6]/20 text-[#F5F7FA] font-semibold py-2.5 px-4 rounded-xl text-sm transition-colors whitespace-nowrap cursor-pointer"
+                className="w-full flex items-center justify-center gap-1.5 sm:gap-2 border border-[#8B5CF6]/40 bg-[#8B5CF6]/10 hover:bg-[#8B5CF6]/20 text-[#F5F7FA] font-semibold py-2 sm:py-2.5 px-2.5 sm:px-4 rounded-xl text-xs sm:text-sm transition-colors whitespace-nowrap cursor-pointer"
               >
                 <Mail className="w-4 h-4 shrink-0 text-[#00E5FF]" />
-                <span>Send Print Query via Mail</span>
+                <span className="truncate">Send Print Query via Mail</span>
               </button>
             </div>
           </div>
@@ -3081,6 +3273,19 @@ export default function App() {
         isOpen={isCameraOpen}
         onClose={() => setIsCameraOpen(false)}
         onCapture={(blob) => loadImageBlob(blob)}
+      />
+
+      <AiSkinBeautyModal
+        isOpen={isAiBeautyModalOpen}
+        onClose={() => setIsAiBeautyModalOpen(false)}
+        previewImageUrl={imageSrc}
+        options={aiBeautyOptions}
+        onChangeOptions={setAiBeautyOptions}
+        onApply={handleApplyAiSkinBeauty}
+        isApplying={isApplyingAiBeauty}
+        statusText={aiBeautyStatusText}
+        aiBeautyApplied={aiBeautyApplied}
+        onRestoreOriginal={handleRestoreOriginal}
       />
 
       <MailQueryModal
