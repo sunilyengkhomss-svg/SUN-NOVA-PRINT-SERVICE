@@ -66,10 +66,10 @@ export default defineConfig(() => {
       cssCodeSplit: false,
       assetsInlineLimit: 32 * 1024,
       rollupOptions: {
-        external: ['onnxruntime-web/webgpu'],
+        external: ['onnxruntime-web', 'onnxruntime-web/webgpu'],
       },
       rolldownOptions: {
-        external: ['onnxruntime-web/webgpu'],
+        external: ['onnxruntime-web', 'onnxruntime-web/webgpu'],
         output: {
           entryFileNames: 'assets/app-[hash].js',
           chunkFileNames: 'assets/chunk-[name]-[hash].js',
