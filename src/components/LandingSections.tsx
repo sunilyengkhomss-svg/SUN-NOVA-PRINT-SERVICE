@@ -624,9 +624,13 @@ export function LandingSections({
       const mailtoBdy = encodeURIComponent(
         `From: ${contactName.trim()} (${contactEmail.trim()})\nPhone: ${contactPhone.trim() || "N/A"}\n\n${contactProject.trim()}`
       );
-      setLastMailtoUrl(
-        `mailto:${OFFICIAL_SUPPORT_EMAIL}?subject=${mailtoSub}&body=${mailtoBdy}`
-      );
+      const mailtoUrl = `mailto:${OFFICIAL_SUPPORT_EMAIL}?subject=${mailtoSub}&body=${mailtoBdy}`;
+      setLastMailtoUrl(mailtoUrl);
+      try {
+        window.open(mailtoUrl, "_blank");
+      } catch {
+        // Fallback if blocked
+      }
       setContactProject("");
       setContactSubject("");
     } catch (err) {

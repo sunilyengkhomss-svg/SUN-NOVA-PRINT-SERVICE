@@ -459,7 +459,7 @@ export default function App() {
   const [supportEmail, setSupportEmail] = useState<string>(() => {
     try {
       const saved = localStorage.getItem("sunnova_support_email");
-      if (!saved) {
+      if (!saved || saved.toLowerCase().includes("sopport")) {
         localStorage.setItem("sunnova_support_email", DEFAULT_SUPPORT_EMAIL);
         return DEFAULT_SUPPORT_EMAIL;
       }
