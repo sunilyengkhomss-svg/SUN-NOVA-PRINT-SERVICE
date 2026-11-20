@@ -108,7 +108,7 @@ function buildClearSessionCookie(isHttps: boolean): string {
 }
 
 async function checkRateLimit(
-  db: D1Database,
+  SUN: D1Database,
   rateKey: string,
   maxHits: number,
   windowSeconds: number
@@ -141,7 +141,7 @@ async function checkRateLimit(
 }
 
 async function logActivity(
-  db: D1Database,
+  SUN: D1Database,
   admin: Pick<AdminUser, "id" | "email"> | null,
   action: string,
   entityType: string,
