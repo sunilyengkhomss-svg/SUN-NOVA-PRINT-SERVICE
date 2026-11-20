@@ -15,9 +15,9 @@
   // are set in Cloudflare Workers Build variables, OR populated automatically by `npm run cf:setup`:
   // "d1_databases": [
   //   {
-  //     "binding": "DB",
-  //     "database_name": "sun-nova-db",
-  //     "database_id": "<YOUR_D1_DATABASE_ID>",
+  //     "binding": "SUN",
+  //     "database_name": "sun-nova-print-service",
+  //     "database_id": "<2ce8587c-3a47-43c1-9a26-0b3f4ecf1>",
   //     "migrations_dir": "migrations"
   //   }
   // ],
