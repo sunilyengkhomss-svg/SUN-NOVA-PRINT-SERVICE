@@ -31,7 +31,6 @@ import {
   Undo2,
   Upload,
   Users,
-  Wand2,
 } from "lucide-react";
 import samplePortraitImg from "./assets/images/sample_portrait_1794641002441.jpg";
 import { CameraCaptureModal } from "./components/CameraCaptureModal";
@@ -45,7 +44,6 @@ import {
   ResponsiveHorizontalBanner,
   SocialBarAd,
 } from "./components/NativeAdBanner";
-import { AiSkinBeautyModal } from "./components/AiSkinBeautyModal";
 import { SheetPreviewCanvas } from "./components/SheetPreviewCanvas";
 import { StudioAiAgent } from "./components/StudioAiAgent";
 import { StudioSections } from "./components/StudioSections";
@@ -54,6 +52,11 @@ import type {
   StudioLiveSnapshot,
 } from "./utils/studioAssistantEngine";
 
+const AiPhotoEnhanceStudio = lazy(() =>
+  import("./components/AiPhotoEnhanceStudio").then((m) => ({
+    default: m.AiPhotoEnhanceStudio,
+  }))
+);
 const IdCardXeroxStudio = lazy(() =>
   import("./components/IdCardXeroxStudio").then((m) => ({
     default: m.IdCardXeroxStudio,
@@ -80,14 +83,12 @@ import {
 } from "./types/cms";
 import { fetchPublicBootstrap } from "./utils/adminApi";
 import {
-  AiSkinBeautyOptions,
   BG_COLORS,
   BORDER_COLOR_PRESETS,
   BRAND_ICON_URL,
   BRAND_NAME,
   OFFICIAL_SITE_URL,
   OFFICIAL_SUPPORT_EMAIL,
-  DEFAULT_AI_SKIN_BEAUTY_OPTIONS,
   DEFAULT_SUPPORT_EMAIL,
   DRESS_PRESETS,
   DressStyleId,
@@ -119,12 +120,11 @@ import {
   setJpegPpi,
   triggerBlobDownload,
 } from "./utils/imageProcessing";
-import { processOnDeviceAiSkinBeauty } from "./utils/skinRetouch";
 import { useTouchScrollIsolation } from "./utils/useTouchScrollIsolation";
 import { useUndoRedo } from "./utils/useUndoRedo";
 
 type StudioTab = "crop" | "sheet";
-type WorkspaceMode = "passport" | "xerox" | "converters" | "resume";
+type WorkspaceMode = "passport" | "enhance" | "xerox" | "converters" | "resume";
 type CountMode = "max" | "line1" | "line2" | "custom";
 type ExtendedDressCategory = "All" | OutfitCategory;
 
@@ -158,9 +158,6 @@ interface PassportStudioState {
   brightness: number;
   contrast: number;
   imageFilter: ImageFilterKey;
-  aiBeautyApplied: boolean;
-  preBeautySrc: string | null;
-  aiBeautyFile: Blob | null;
   showHeadGuide: boolean;
   bgColor: string;
   bgImageUrl: string | null;
@@ -199,9 +196,6 @@ const INITIAL_PASSPORT_STUDIO_STATE: PassportStudioState = {
   brightness: 100,
   contrast: 100,
   imageFilter: "none",
-  aiBeautyApplied: false,
-  preBeautySrc: null,
-  aiBeautyFile: null,
   showHeadGuide: true,
   bgColor: "#FFFFFF",
   bgImageUrl: null,
@@ -302,9 +296,6 @@ export default function App() {
     brightness,
     contrast,
     imageFilter,
-    aiBeautyApplied,
-    preBeautySrc,
-    aiBeautyFile,
     showHeadGuide,
     bgColor,
     bgImageUrl,
@@ -412,14 +403,8 @@ export default function App() {
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [croppedAreaPercent, setCroppedAreaPercent] = useState<Area | null>(null);
 
-  // AI Skin Beauty Modal & Hold-to-Compare State (Zero-API-Key On-Device)
+  // Hold-to-Compare State (Background Cutout Before/After)
   const [isComparingOriginal, setIsComparingOriginal] = useState(false);
-  const [aiBeautyOptions, setAiBeautyOptions] = useState<AiSkinBeautyOptions>(
-    DEFAULT_AI_SKIN_BEAUTY_OPTIONS
-  );
-  const [isAiBeautyModalOpen, setIsAiBeautyModalOpen] = useState(false);
-  const [isApplyingAiBeauty, setIsApplyingAiBeauty] = useState(false);
-  const [aiBeautyStatusText, setAiBeautyStatusText] = useState("");
 
   // Async Status & Feedback
   const [isRemovingBg, setIsRemovingBg] = useState(false);
@@ -474,7 +459,7 @@ export default function App() {
   const [supportEmail, setSupportEmail] = useState<string>(() => {
     try {
       const saved = localStorage.getItem("sunnova_support_email");
-      if (!saved || saved.toLowerCase().includes("sunilyengkhomss")) {
+      if (!saved) {
         localStorage.setItem("sunnova_support_email", DEFAULT_SUPPORT_EMAIL);
         return DEFAULT_SUPPORT_EMAIL;
       }
@@ -488,7 +473,6 @@ export default function App() {
     const cmsEmail = cmsData?.settings?.contactEmail?.trim();
     if (
       cmsEmail &&
-      !cmsEmail.toLowerCase().includes("sunilyengkhomss") &&
       supportEmail === DEFAULT_SUPPORT_EMAIL
     ) {
       setSupportEmail(cmsEmail);
@@ -729,9 +713,6 @@ export default function App() {
         originalSrc: url,
         imageSrc: url,
         bgRemoved: false,
-        aiBeautyApplied: false,
-        preBeautySrc: null,
-        aiBeautyFile: null,
         zoom: 1,
         rotation: 0,
         brightness: 100,
@@ -1113,9 +1094,6 @@ export default function App() {
       originalFile: item.sourceFile || null,
       imageSrc: item.sourceUrl,
       bgRemoved: false,
-      aiBeautyApplied: false,
-      preBeautySrc: null,
-      aiBeautyFile: null,
       zoom: 1,
       rotation: 0,
       brightness: 100,
@@ -1143,17 +1121,16 @@ export default function App() {
     setSheetQueue((prev) => prev.filter((item) => item.id !== id));
   };
 
-  // Client-Side AI Background Removal (preserves AI Skin Beauty if applied first)
+  // Client-Side AI Background Removal
   const handleRemoveBackground = async () => {
-    const sourceBlob = aiBeautyApplied && aiBeautyFile ? aiBeautyFile : originalFile;
-    if (!sourceBlob) return;
+    if (!originalFile) return;
     try {
       setErrorMessage(null);
       setIsRemovingBg(true);
       setBgStatusText("Preparing AI model...");
       const { removeBackground } = await import("@imgly/background-removal");
 
-      const transparentBlob = await removeBackground(sourceBlob, {
+      const transparentBlob = await removeBackground(originalFile, {
         progress: (_key: string, current: number, total: number) => {
           if (total > 0) {
             const pct = Math.min(100, Math.round((current / total) * 100));
@@ -1166,8 +1143,6 @@ export default function App() {
       patchStudio({
         imageSrc: newUrl,
         bgRemoved: true,
-        preBeautySrc: null,
-        aiBeautyFile: aiBeautyApplied ? transparentBlob : null,
       });
       setBgStatusText("");
     } catch (err) {
@@ -1180,58 +1155,11 @@ export default function App() {
     }
   };
 
-  // Zero-API-Key On-Device AI Skin Beauty & Pimple Removal
-  const handleApplyAiSkinBeauty = async (chosenOptions: AiSkinBeautyOptions) => {
-    const baseSrc = preBeautySrc || imageSrc;
-    if (!baseSrc) return;
-    try {
-      setAiBeautyOptions(chosenOptions);
-      setErrorMessage(null);
-      setIsApplyingAiBeauty(true);
-      setAiBeautyStatusText("Analyzing skin tone (10%)");
-
-      const img = await loadHtmlImage(baseSrc);
-      const retouchedBlob = await processOnDeviceAiSkinBeauty(
-        img,
-        chosenOptions,
-        bgRemoved,
-        (_pct, stageLabel) => {
-          setAiBeautyStatusText(stageLabel);
-        }
-      );
-
-      const nextUrl = URL.createObjectURL(retouchedBlob);
-      patchStudio({
-        imageSrc: nextUrl,
-        aiBeautyApplied: true,
-        preBeautySrc: baseSrc,
-        aiBeautyFile: retouchedBlob,
-      });
-      setIsComparingOriginal(false);
-      setIsAiBeautyModalOpen(false);
-      setAiBeautyStatusText("");
-      setExportMessage(
-        "AI Skin Beauty applied cleanly. Hold Before / After to compare or download at 300 PPI."
-      );
-    } catch (err) {
-      console.error(err);
-      setErrorMessage(
-        "AI Skin Beauty could not complete on this image. Please try again."
-      );
-    } finally {
-      setIsApplyingAiBeauty(false);
-      setAiBeautyStatusText("");
-    }
-  };
-
   const handleRestoreOriginal = () => {
     if (!originalSrc) return;
     patchStudio({
       imageSrc: originalSrc,
       bgRemoved: false,
-      aiBeautyApplied: false,
-      preBeautySrc: null,
-      aiBeautyFile: null,
     });
     setIsComparingOriginal(false);
     setErrorMessage(null);
@@ -1470,7 +1398,6 @@ export default function App() {
       gapMm,
       bgColor,
       bgRemoved,
-      aiBeautyApplied,
       dressLabel: activeDressLabel,
       queueCount: sheetQueue.length,
       targetKB,
@@ -1487,7 +1414,6 @@ export default function App() {
       gapMm,
       bgColor,
       bgRemoved,
-      aiBeautyApplied,
       activeDressLabel,
       sheetQueue.length,
       targetKB,
@@ -1535,15 +1461,10 @@ export default function App() {
         closeOnCompact();
         scrollToWorkbench();
         break;
-      case "open_ai_beauty":
-        setWorkspaceMode("passport");
-        setActiveTab("crop");
+      case "open_enhance":
+        setWorkspaceMode("enhance");
         closeOnCompact();
-        if (imageSrc) {
-          setIsAiBeautyModalOpen(true);
-        } else {
-          scrollToWorkbench();
-        }
+        scrollToWorkbench();
         break;
       case "jump_size":
         jumpPassportStep("size");
@@ -1604,6 +1525,12 @@ export default function App() {
       <Header
         cmsSettings={cmsData?.settings}
         onMailQuery={() => handleOpenMailQuery()}
+        onOpenEnhance={() => {
+          setWorkspaceMode("enhance");
+          document
+            .getElementById("studio-workbench")
+            ?.scrollIntoView({ behavior: "smooth" });
+        }}
       />
 
       <main className="flex-1 w-full">
@@ -1631,11 +1558,11 @@ export default function App() {
           className="studio-dark-shell max-w-7xl w-full mx-auto px-2 sm:px-4 lg:px-6 pt-6 sm:pt-10 pb-6"
         >
           {/* Compact Centered Workspace Mode Switcher */}
-          <div className="mb-6 sm:mb-7 max-w-4xl mx-auto">
+          <div className="mb-6 sm:mb-7 max-w-5xl mx-auto">
             <p className="text-center text-[10px] sm:text-[11px] font-mono-nums tracking-[0.18em] text-[#00E5FF] uppercase mb-2.5">
               {BRAND_NAME} · Precision Digital Print Studio
             </p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 p-1.5 bg-[#111827] border border-[#00E5FF]/20 rounded-xl w-full">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5 p-1.5 bg-[#111827] border border-[#00E5FF]/20 rounded-xl w-full">
               <button
                 type="button"
                 onClick={() => setWorkspaceMode("passport")}
@@ -1647,6 +1574,18 @@ export default function App() {
               >
                 <ImageIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                 <span className="truncate">Passport Photo Studio</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setWorkspaceMode("enhance")}
+                className={`inline-flex items-center justify-center gap-1.5 px-2 md:px-2.5 lg:px-3 py-2 sm:py-2.5 text-[11px] sm:text-xs lg:text-sm font-semibold rounded-lg transition-all cursor-pointer min-h-[40px] sm:min-h-[42px] ${
+                  workspaceMode === "enhance"
+                    ? "bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12] shadow-sm font-bold"
+                    : "text-[#94A3B8] hover:text-[#F5F7FA] hover:bg-white/5"
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                <span className="truncate">AI Photo Enhance</span>
               </button>
               <button
                 type="button"
@@ -1687,7 +1626,29 @@ export default function App() {
             </div>
           </div>
 
-          {workspaceMode === "xerox" ? (
+          {workspaceMode === "enhance" ? (
+            <Suspense
+              fallback={
+                <div className="glass-card p-10 text-center text-sm text-[#94A3B8]">
+                  Loading AI Photo Enhance Studio...
+                </div>
+              }
+            >
+              <AiPhotoEnhanceStudio
+                onSendToPassport={(blob, label) => {
+                  loadImageBlob(blob);
+                  setWorkspaceMode("passport");
+                  setExportMessage(
+                    `Loaded ${label || "enhanced photo"} into Passport Photo Studio. Crop, add outfits/borders, or generate a 300 PPI print sheet.`
+                  );
+                  document
+                    .getElementById("studio-workbench")
+                    ?.scrollIntoView({ behavior: "smooth" });
+                }}
+                onMailQuery={(summary) => handleOpenMailQuery(summary)}
+              />
+            </Suspense>
+          ) : workspaceMode === "xerox" ? (
             <Suspense
               fallback={
                 <div className="glass-card p-10 text-center text-sm text-[#94A3B8]">
@@ -1815,7 +1776,7 @@ export default function App() {
                         <>
                           <button
                             type="button"
-                            disabled={!aiBeautyApplied && !bgRemoved}
+                            disabled={!bgRemoved}
                             onPointerDown={() => setIsComparingOriginal(true)}
                             onPointerUp={() => setIsComparingOriginal(false)}
                             onPointerLeave={() => setIsComparingOriginal(false)}
@@ -1827,11 +1788,11 @@ export default function App() {
                             }}
                             onKeyUp={() => setIsComparingOriginal(false)}
                             onBlur={() => setIsComparingOriginal(false)}
-                            title="Press and hold to compare with the unretouched original photo"
+                            title="Press and hold to compare with the original background"
                             className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors whitespace-nowrap shrink-0 select-none ${
                               isComparingOriginal
                                 ? "border-[#00E5FF] bg-[#00E5FF] text-[#080B12] cursor-pointer"
-                                : aiBeautyApplied || bgRemoved
+                                : bgRemoved
                                 ? "border-[#00E5FF]/50 bg-[#00E5FF]/10 text-[#F5F7FA] hover:border-[#00E5FF] cursor-pointer"
                                 : "border-[#00E5FF]/15 text-slate-500 cursor-not-allowed"
                             }`}
@@ -2007,7 +1968,7 @@ export default function App() {
                         <Cropper
                           image={
                             isComparingOriginal
-                              ? preBeautySrc || originalSrc || imageSrc
+                              ? originalSrc || imageSrc
                               : imageSrc
                           }
                           crop={crop}
@@ -2251,14 +2212,14 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* AI Background Removal, AI Skin Beauty & Add to Multi-Photo Queue Bar */}
+                    {/* AI Background Removal, AI Enhance Shortcut & Add to Multi-Photo Queue Bar */}
                     <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-[#00E5FF]/15 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
                       <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                        {(bgRemoved || aiBeautyApplied) && (
+                        {bgRemoved && (
                           <button
                             type="button"
                             onClick={handleRestoreOriginal}
-                            disabled={isRemovingBg || isApplyingAiBeauty}
+                            disabled={isRemovingBg}
                             className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold text-[#F5F7FA] bg-[#161D2B] border border-[#00E5FF]/20 hover:border-[#00E5FF]/50 disabled:opacity-50 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
@@ -2269,7 +2230,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={handleRemoveBackground}
-                          disabled={isRemovingBg || isApplyingAiBeauty}
+                          disabled={isRemovingBg}
                           className="inline-flex items-center gap-1.5 sm:gap-2 bg-[#161D2B] border border-[#00E5FF]/35 hover:border-[#00E5FF] disabled:opacity-50 text-[#F5F7FA] text-[11px] sm:text-xs font-semibold px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                         >
                           {isRemovingBg ? (
@@ -2289,29 +2250,16 @@ export default function App() {
 
                         <button
                           type="button"
-                          onClick={() => setIsAiBeautyModalOpen(true)}
-                          disabled={isApplyingAiBeauty || isRemovingBg}
-                          className={`inline-flex items-center gap-1.5 sm:gap-2 border disabled:opacity-50 text-[11px] sm:text-xs font-semibold px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-                            aiBeautyApplied
-                              ? "bg-[#00E5FF]/15 border-[#00E5FF] text-[#F5F7FA] hover:bg-[#00E5FF]/25"
-                              : "bg-[#161D2B] border-[#8B5CF6]/55 hover:border-[#00E5FF] text-[#F5F7FA]"
-                          }`}
+                          onClick={() => {
+                            setWorkspaceMode("enhance");
+                            document
+                              .getElementById("studio-workbench")
+                              ?.scrollIntoView({ behavior: "smooth" });
+                          }}
+                          className="inline-flex items-center gap-1.5 bg-[#161D2B] border border-[#8B5CF6]/45 hover:border-[#00E5FF] text-[#F5F7FA] text-[11px] sm:text-xs font-semibold px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                         >
-                          {isApplyingAiBeauty ? (
-                            <>
-                              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#00E5FF]" />
-                              <span>{aiBeautyStatusText || "Retouching..."}</span>
-                            </>
-                          ) : (
-                            <>
-                              <Wand2 className="w-3.5 h-3.5 text-[#00E5FF]" />
-                              <span>
-                                {aiBeautyApplied
-                                  ? "AI Skin Beauty (Edit)"
-                                  : "AI Skin Beauty"}
-                              </span>
-                            </>
-                          )}
+                          <Sparkles className="w-3.5 h-3.5 text-[#8B5CF6]" />
+                          <span>AI Enhance Studio</span>
                         </button>
                       </div>
 
@@ -3389,19 +3337,6 @@ export default function App() {
         isOpen={isCameraOpen}
         onClose={() => setIsCameraOpen(false)}
         onCapture={(blob) => loadImageBlob(blob)}
-      />
-
-      <AiSkinBeautyModal
-        isOpen={isAiBeautyModalOpen}
-        onClose={() => setIsAiBeautyModalOpen(false)}
-        previewImageUrl={imageSrc}
-        options={aiBeautyOptions}
-        onChangeOptions={setAiBeautyOptions}
-        onApply={handleApplyAiSkinBeauty}
-        isApplying={isApplyingAiBeauty}
-        statusText={aiBeautyStatusText}
-        aiBeautyApplied={aiBeautyApplied}
-        onRestoreOriginal={handleRestoreOriginal}
       />
 
       <MailQueryModal

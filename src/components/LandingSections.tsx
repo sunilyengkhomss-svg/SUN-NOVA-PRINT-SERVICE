@@ -487,6 +487,7 @@ export function LandingSections({
     type: "success" | "error";
     text: string;
   } | null>(null);
+  const [lastMailtoUrl, setLastMailtoUrl] = useState<string | null>(null);
 
   const handleSelectServiceForQuote = (serviceName: string) => {
     setQuoteService(serviceName);
@@ -617,6 +618,15 @@ export function LandingSections({
         type: "success",
         text: `Message sent to Print Desk (Ref #${res.messageId.slice(0, 8)}). We will respond to ${contactEmail.trim()}.`,
       });
+      const mailtoSub = encodeURIComponent(
+        contactSubject.trim() || `Print Project Inquiry from ${contactName.trim()}`
+      );
+      const mailtoBdy = encodeURIComponent(
+        `From: ${contactName.trim()} (${contactEmail.trim()})\nPhone: ${contactPhone.trim() || "N/A"}\n\n${contactProject.trim()}`
+      );
+      setLastMailtoUrl(
+        `mailto:${OFFICIAL_SUPPORT_EMAIL}?subject=${mailtoSub}&body=${mailtoBdy}`
+      );
       setContactProject("");
       setContactSubject("");
     } catch (err) {
@@ -1683,16 +1693,31 @@ export function LandingSections({
               </div>
 
               {contactStatus && (
-                <p
-                  role="status"
-                  className={`text-xs rounded-xl px-3.5 py-2.5 border ${
-                    contactStatus.type === "success"
-                      ? "bg-emerald-950/60 border-emerald-500/40 text-emerald-200"
-                      : "bg-rose-950/60 border-rose-500/40 text-rose-200"
-                  }`}
-                >
-                  {contactStatus.text}
-                </p>
+                <div className="space-y-2">
+                  <p
+                    role="status"
+                    className={`text-xs rounded-xl px-3.5 py-2.5 border ${
+                      contactStatus.type === "success"
+                        ? "bg-emerald-950/60 border-emerald-500/40 text-emerald-200"
+                        : "bg-rose-950/60 border-rose-500/40 text-rose-200"
+                    }`}
+                  >
+                    {contactStatus.text}
+                  </p>
+                  {contactStatus.type === "success" && lastMailtoUrl && (
+                    <a
+                      href={lastMailtoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-gradient-to-r from-[#00E5FF] to-[#8B5CF6] text-[#080B12] font-bold text-xs hover:brightness-110 transition-all shadow-sm cursor-pointer"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      <span>
+                        Deliver to Official Support Mail ({OFFICIAL_SUPPORT_EMAIL})
+                      </span>
+                    </a>
+                  )}
+                </div>
               )}
 
               <button

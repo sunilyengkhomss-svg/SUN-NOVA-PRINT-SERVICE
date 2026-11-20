@@ -45,13 +45,13 @@ function createWelcomeMessage(): ChatMessage {
   return {
     id: "welcome",
     role: "model",
-    text: `Hello! I am the built-in ${BRAND_NAME} Guide — works instantly with zero API key. Ask about 300 PPI photo sizes, AI Skin Beauty, Student & Officer outfits, A4 6-photo rows, Aadhaar/PAN Xerox, PDF/XML tools, or your current settings.`,
+    text: `Hello! I am the built-in ${BRAND_NAME} Guide — works instantly with zero API key. Ask about AI Photo Enhance (HD/4K upscaling, deblurring, face retouch), 300 PPI photo sizes, Student & Officer outfits, A4 6-photo rows, Aadhaar/PAN Xerox, or your current settings.`,
   };
 }
 
 function getActionIcon(id: StudioAssistantActionId) {
   switch (id) {
-    case "open_ai_beauty":
+    case "open_enhance":
       return <Wand2 className="w-3.5 h-3.5 shrink-0" />;
     case "jump_size":
       return <Ruler className="w-3.5 h-3.5 shrink-0" />;
@@ -132,11 +132,13 @@ export function StudioAiAgent({
   const liveSummaryLine = `${
     studioSnapshot.workspaceMode === "passport"
       ? `${studioSnapshot.presetLabel} · ${studioSnapshot.paperLabel} (${studioSnapshot.sheetCount})`
-      : studioSnapshot.workspaceMode === "xerox"
-        ? "Aadhaar / PAN / ID Xerox"
-        : studioSnapshot.workspaceMode === "converters"
-          ? "PDF, XML & Text Converters"
-          : "Resume Maker"
+      : studioSnapshot.workspaceMode === "enhance"
+        ? "AI Photo Enhance Studio"
+        : studioSnapshot.workspaceMode === "xerox"
+          ? "Aadhaar / PAN / ID Xerox"
+          : studioSnapshot.workspaceMode === "converters"
+            ? "PDF, XML & Text Converters"
+            : "Resume Maker"
   }`;
 
   return (

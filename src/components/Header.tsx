@@ -5,6 +5,7 @@ import { BRAND_ICON_URL, BRAND_NAME, OFFICIAL_SUPPORT_EMAIL } from "../types/pho
 
 interface HeaderProps {
   onMailQuery: () => void;
+  onOpenEnhance?: () => void;
   cmsSettings?: WebsiteSettings;
 }
 
@@ -17,7 +18,11 @@ const DEFAULT_NAV_LINKS = [
   { href: "#contact", label: "Contact" },
 ];
 
-export function Header({ onMailQuery, cmsSettings }: HeaderProps) {
+export function Header({
+  onMailQuery,
+  onOpenEnhance,
+  cmsSettings,
+}: HeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const logoText = cmsSettings?.logoText?.trim() || BRAND_NAME;
@@ -57,6 +62,15 @@ export function Header({ onMailQuery, cmsSettings }: HeaderProps) {
               {link.label}
             </a>
           ))}
+          {onOpenEnhance && (
+            <button
+              type="button"
+              onClick={onOpenEnhance}
+              className="text-[#00E5FF] hover:text-[#F5F7FA] hover:underline underline-offset-8 decoration-[#00E5FF]/60 transition-colors whitespace-nowrap shrink-0 cursor-pointer font-semibold"
+            >
+              AI Enhance
+            </button>
+          )}
         </nav>
 
         <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
@@ -106,6 +120,18 @@ export function Header({ onMailQuery, cmsSettings }: HeaderProps) {
                 {link.label}
               </a>
             ))}
+            {onOpenEnhance && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileOpen(false);
+                  onOpenEnhance();
+                }}
+                className="px-3 py-2.5 rounded-lg bg-[#00E5FF]/12 border border-[#00E5FF]/40 text-sm font-semibold text-[#00E5FF] hover:bg-[#00E5FF]/20 transition-colors text-center sm:text-left cursor-pointer"
+              >
+                AI Photo Enhance
+              </button>
+            )}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
             <a

@@ -3,7 +3,7 @@ import { BRAND_NAME } from "../types/photo";
 export type StudioAssistantActionId =
   | "open_passport"
   | "open_sheet_preview"
-  | "open_ai_beauty"
+  | "open_enhance"
   | "jump_size"
   | "jump_bg_cut"
   | "jump_outfit"
@@ -22,7 +22,7 @@ export interface StudioAssistantAction {
 }
 
 export interface StudioLiveSnapshot {
-  workspaceMode: "passport" | "xerox" | "converters" | "resume";
+  workspaceMode: "passport" | "enhance" | "xerox" | "converters" | "resume";
   hasImage: boolean;
   presetLabel: string;
   dimensionsText: string;
@@ -31,7 +31,6 @@ export interface StudioLiveSnapshot {
   gapMm: number;
   bgColor: string;
   bgRemoved: boolean;
-  aiBeautyApplied: boolean;
   dressLabel: string;
   queueCount: number;
   targetKB: number;
@@ -46,8 +45,8 @@ export interface AssistantReply {
 
 export const STARTER_ASSISTANT_PROMPTS: readonly string[] = [
   "Which size fits Passport Seva or SSC forms?",
+  "How do I upscale to HD/4K or unblur a photo?",
   "How to put 6 different photos in 1 A4 row?",
-  "How do I remove pimples and brighten skin?",
   "How to align Student or Officer outfits?",
   "How to make Aadhaar Front & Back Up-Down Xerox?",
   "Check my current studio settings",
@@ -55,6 +54,7 @@ export const STARTER_ASSISTANT_PROMPTS: readonly string[] = [
 
 const WORKSPACE_NAMES: Record<StudioLiveSnapshot["workspaceMode"], string> = {
   passport: "Passport Photo Studio",
+  enhance: "AI Photo Enhance Studio",
   xerox: "Aadhaar / PAN / ID Xerox",
   converters: "PDF, XML & Text Converters",
   resume: "Resume Maker",
@@ -96,7 +96,6 @@ function buildLiveStatusLines(s: StudioLiveSnapshot): string {
     `• Crop Size: ${s.presetLabel} (${s.dimensionsText} @ 300 PPI)`,
     `• Print Sheet: ${s.paperLabel} · ${s.sheetCount} photos · ${s.gapMm} mm gap`,
     `• Background: ${formatBgColorLabel(s.bgColor)}${s.bgRemoved ? " (AI BG Removed)" : ""}`,
-    `• AI Skin Beauty: ${s.aiBeautyApplied ? "Applied (300 PPI ready)" : "Off"}`,
     `• Outfit Overlay: ${s.dressLabel}`,
     `• Multi-Photo Queue: ${s.queueCount} ${s.queueCount === 1 ? "person" : "people"} queued`,
     `• Single Photo KB Target: ${kbText}`,
@@ -150,8 +149,8 @@ const TOPIC_RULES: readonly TopicRule[] = [
         actions,
         followUps: [
           "Which size fits Passport Seva or SSC forms?",
+          "How do I upscale to HD/4K or unblur a photo?",
           "How do I compress under 50 KB?",
-          "How do I remove pimples and brighten skin?",
         ],
       };
     },
@@ -283,76 +282,70 @@ const TOPIC_RULES: readonly TopicRule[] = [
     }),
   },
   {
-    id: "ai_skin_beauty",
+    id: "ai_photo_enhance",
     phrases: [
-      "skin beauty",
-      "ai skin",
-      "remove pimple",
-      "pimple removal",
-      "dark spot",
-      "dark circle",
-      "under eye",
-      "brighten skin",
-      "skin whitening",
-      "smooth skin",
-      "oil shine",
+      "photo enhance",
+      "ai enhance",
+      "hd upscale",
+      "4k upscale",
+      "upscale photo",
+      "super resolution",
+      "real esrgan",
+      "blur removal",
+      "unblur photo",
+      "remove blur",
+      "face retouch",
+      "colour correction",
+      "color correction",
+      "lighting correction",
       "before after",
-      "restore original",
-      "all skin type",
+      "before and after",
     ],
     keywords: [
-      "skin",
-      "beauty",
-      "pimple",
-      "pimples",
-      "acne",
-      "spot",
-      "spots",
+      "enhance",
+      "upscale",
+      "upscaling",
+      "4k",
+      "hd",
+      "esrgan",
+      "blur",
+      "blurry",
+      "unblur",
+      "deblur",
+      "sharpen",
+      "sharpness",
+      "denoise",
+      "noise",
+      "face",
+      "retouch",
       "blemish",
       "blemishes",
-      "scar",
-      "scars",
-      "circle",
-      "circles",
       "smooth",
-      "pore",
-      "pores",
-      "oil",
-      "shine",
-      "whiten",
-      "whitening",
-      "brighten",
-      "fair",
-      "glow",
-      "retouch",
-      "face",
-      "tone",
-      "makeup",
+      "skin",
+      "exposure",
+      "white balance",
+      "vibrance",
+      "lighting",
+      "restore",
     ],
     weight: 2,
-    build: (s) => ({
+    build: () => ({
       text: [
-        "AI Skin Beauty & Pimple Removal works 100% on-device with zero API key:",
-        "1. Upload or capture a portrait, then tap AI Skin Beauty (right next to AI Remove BG).",
-        "2. Pick a 1-tap preset (Natural Passport, Acne Clear, Studio Glow, or Fair & Bright) or fine-tune:",
-        "   • Pimples, Acne & Dark Spots (CIE L*a*b* blemish healing)",
-        "   • Smooth Skin, Pores & Oil Shine",
-        "   • Brighten Under-Eye Dark Circles & Studio Lighting",
-        "   • 4-step Natural Skin Whitening (Off / Light / Medium / Bright) + 7 All-Skin-Type tone presets.",
-        "3. Tap Apply AI Skin Beauty — hold Before / After to compare, or tap Restore Original anytime.",
-        "",
-        `Live status: ${s.aiBeautyApplied ? "AI Skin Beauty is currently active on your photo." : s.hasImage ? "Your photo is loaded and ready for AI Skin Beauty." : "Upload a photo first to run AI Skin Beauty."}`,
+        "AI Photo Enhance Studio (100% browser-private · Zero API key):",
+        "• A. AI HD / 4K Upscaling: Open-source ESRGAN 2× (HD) & 4× (4K) neural super-resolution via tiled TensorFlow.js inference.",
+        "• B. Blur Removal & Sharpening: Iterative deconvolution deblurring, edge-preserving noise reduction, and natural texture sharpening.",
+        "• C. Background Removal & Replacement: Neural cutout preserving fine hair edges with Transparent, White, Blue, Grey, or Custom colour fills.",
+        "• D. Natural Face Retouching: Subtle skin smoothing, minor blemish cleanup, and facial/eye clarity without artificial filters.",
+        "• E. Colour & Lighting Correction: Auto exposure, white balance, brightness, contrast, and vibrance + interactive draggable Before/After split slider & 300 PPI JPG/PNG export.",
+        "• One-tap Send to Passport Studio & Sheet Layout lets you crop and sheet-print your enhanced photo right away!",
       ].join("\n"),
       actions: [
-        {
-          id: "open_ai_beauty",
-          label: s.hasImage ? "Open AI Skin Beauty" : "Go to Photo Upload",
-        },
-        { id: "jump_bg_cut", label: "03 BG & Cut Options" },
+        { id: "open_enhance", label: "Open AI Photo Enhance Studio" },
+        { id: "open_passport", label: "Open Passport Studio" },
       ],
       followUps: [
         "How do I remove and change the background color?",
-        "How to align Student or Officer outfits?",
+        "Which size fits Passport Seva or SSC forms?",
         "Does this app need an API key or upload my photo?",
       ],
     }),
@@ -387,15 +380,14 @@ const TOPIC_RULES: readonly TopicRule[] = [
     build: (s) => ({
       text: [
         "How to remove & replace photo backgrounds (100% in browser, no API key):",
-        "1. Click AI Remove BG right below your photo preview to cut out the background automatically.",
-        "2. In 03. Background Color (Right Panel), pick Pure White (recommended for India Passport, US Visa & PAN), Light Blue, Sky Blue, Light Grey, or any Custom color.",
-        "3. Tip: You can combine AI Remove BG and AI Skin Beauty in any order — both stay crisp at 300 PPI.",
+        "1. In Passport Photo Studio, click AI Remove BG below your photo preview, then choose Pure White, Light Blue, Sky Blue, Light Grey, or Custom under 03. Background Color.",
+        "2. Or open AI Photo Enhance Studio → Background tab to remove backgrounds with transparent PNG export or solid colour replacement and compare Before/After.",
         "",
         `Current studio background: ${formatBgColorLabel(s.bgColor)}${s.bgRemoved ? " (BG Cutout Active)" : ""}.`,
       ].join("\n"),
       actions: [
         { id: "jump_bg_cut", label: "Jump to 03 BG & Cut" },
-        { id: "open_ai_beauty", label: "Open AI Skin Beauty" },
+        { id: "open_enhance", label: "Open AI Photo Enhance" },
       ],
       followUps: [
         "How to align Student or Officer outfits?",
@@ -808,10 +800,10 @@ const TOPIC_RULES: readonly TopicRule[] = [
       ].join("\n"),
       actions: [
         { id: "open_passport", label: "Open Passport Studio" },
-        { id: "open_ai_beauty", label: "Open AI Skin Beauty" },
+        { id: "open_enhance", label: "Open AI Photo Enhance" },
       ],
       followUps: [
-        "How do I remove pimples and brighten skin?",
+        "How do I upscale to HD/4K or unblur a photo?",
         "Check my current studio settings",
       ],
     }),
@@ -847,7 +839,7 @@ const TOPIC_RULES: readonly TopicRule[] = [
     build: () => ({
       text: [
         "100% Private & Zero-API-Key Architecture:",
-        "• No API key needed: This Studio Guide, AI Skin Beauty, AI Remove BG, 300 PPI Sheet Engine, Aadhaar/PAN Xerox, PDF/XML Converters, and Resume Maker all run directly on your device.",
+        "• No API key needed: This Studio Guide, AI Photo Enhance Studio (ESRGAN HD/4K upscaling, deblurring, neural BG removal, face retouch, colour correction), 300 PPI Passport Sheets, Aadhaar/PAN Xerox, PDF/XML Converters, and Resume Maker all run directly on your device.",
         "• Your photos & ID cards never leave your browser — nothing is uploaded or stored on third-party servers.",
         "• Works smoothly on desktop and mobile even without cloud AI keys configured.",
       ].join("\n"),
@@ -952,23 +944,25 @@ const TOPIC_RULES: readonly TopicRule[] = [
     ],
     build: (s) => ({
       text: [
-        `Welcome to ${BRAND_NAME}! I am your built-in app guide (zero API key needed). I can walk you through all 4 studio workspaces:`,
-        "1. Passport Photo Studio — 300 PPI exam/visa presets, AI Remove BG, AI Skin Beauty & Pimple Removal, Student/Officer outfits, cut outlines, Name & DOP strip, KB compression, and A4 Multi-Photo sheets.",
-        "2. Aadhaar / PAN / ID Xerox — Front & Back Up-Down, Side-by-Side, or 2×2 CR80 layouts.",
-        "3. PDF, XML & Text Converters — Photo↔PDF, Text→Image, Image→Text OCR, and XML↔JSON/CSV.",
-        "4. Resume Maker — 4 templates, role presets, photo crop, and 300 PPI A4 export.",
+        `Welcome to ${BRAND_NAME}! I am your built-in app guide (zero API key needed). I can walk you through all 5 studio workspaces:`,
+        "1. Passport Photo Studio — 300 PPI exam/visa presets, AI Remove BG, Student/Officer outfits, cut outlines, Name & DOP strip, KB compression, and A4 Multi-Photo sheets.",
+        "2. AI Photo Enhance Studio — Open-source ESRGAN HD/4K upscaling, blur removal & sharpening, neural background removal, natural face retouching, colour/lighting correction, Before/After slider, and 300 PPI print export.",
+        "3. Aadhaar / PAN / ID Xerox — Front & Back Up-Down, Side-by-Side, or 2×2 CR80 layouts.",
+        "4. PDF, XML & Text Converters — Photo↔PDF, Text→Image, Image→Text OCR, and XML↔JSON/CSV.",
+        "5. Resume Maker — 4 templates, role presets, photo crop, and 300 PPI A4 export.",
         "",
         `You are currently in: ${WORKSPACE_NAMES[s.workspaceMode]}. Tap a shortcut below or ask any question!`,
       ].join("\n"),
       actions: [
         { id: "open_passport", label: "Passport Studio" },
+        { id: "open_enhance", label: "AI Photo Enhance" },
         { id: "open_xerox", label: "ID Card Xerox" },
         { id: "open_converters", label: "PDF & XML Tools" },
         { id: "open_resume", label: "Resume Maker" },
       ],
       followUps: [
         "Which size fits Passport Seva or SSC forms?",
-        "How do I remove pimples and brighten skin?",
+        "How do I upscale to HD/4K or unblur a photo?",
         "Check my current studio settings",
       ],
     }),
@@ -1022,13 +1016,14 @@ export function generateStudioAssistantReply(
       `I am the built-in ${BRAND_NAME} App Guide (works offline with zero API key), so I specialize strictly in tools inside this app:`,
       "• Passport & Exam Photo Sizes (Passport Seva, SSC, UPSC, US Visa, PAN, Custom 300 PPI)",
       "• A4 1-Line (6 Different Photos), Print Sheets, Photo Gaps & Cut Outlines",
-      "• AI Skin Beauty & Pimple Removal, AI Remove BG, and Student/Officer Outfits",
+      "• AI Photo Enhance Studio (HD/4K ESRGAN Upscaling, Deblur, Neural BG Removal, Face Retouch, Colour Correction)",
       "• Name & DOP Strips and < 20 / 50 / 100 / 200 KB Portal Compression",
       "• Aadhaar / PAN / ID Card Xerox, PDF/XML/OCR Converters, and Resume Maker",
       "",
       "Need help with a custom print order or question outside these tools? Use Mail Print Desk below.",
     ].join("\n"),
     actions: [
+      { id: "open_enhance", label: "AI Photo Enhance" },
       { id: "open_passport", label: "Passport Studio" },
       {
         id: "open_mail_desk",
@@ -1039,8 +1034,8 @@ export function generateStudioAssistantReply(
     ],
     followUps: [
       "Check my current studio settings",
+      "How do I upscale to HD/4K or unblur a photo?",
       "Which size fits Passport Seva or SSC forms?",
-      "How do I remove pimples and brighten skin?",
     ],
   };
 }

@@ -2,7 +2,7 @@ export const BRAND_NAME = "SUN-NOVA PRINT SERVICE";
 export const BRAND_ICON_URL = "/assets/aistudio/Sun-Nova_Print_Service_Icon_0e46cdd8.png";
 export const OFFICIAL_SITE_URL =
   (typeof import.meta !== "undefined" && import.meta.env?.VITE_SITE_URL) || "";
-export const OFFICIAL_SUPPORT_EMAIL = "sopport.sunnovaprintservice@gmail.com";
+export const OFFICIAL_SUPPORT_EMAIL = "support.sunnovaprintservice@gmail.com";
 export const DEFAULT_SUPPORT_EMAIL = OFFICIAL_SUPPORT_EMAIL;
 export const PRINT_PPI = 300;
 
@@ -345,125 +345,6 @@ export const IMAGE_FILTER_PRESETS: ImageFilterPreset[] = [
   { id: "warm", label: "Warm Tone", description: "Soft studio warmth" },
   { id: "cool_studio", label: "Cool Studio", description: "Crisp daylight" },
 ];
-
-export type SkinTonePresetKey =
-  | "original"
-  | "fair"
-  | "natural"
-  | "warm"
-  | "rosy"
-  | "olive"
-  | "deep_glow";
-
-export type SkinWhiteningLevel = "off" | "light" | "medium" | "bright";
-
-export interface AiSkinBeautyOptions {
-  removePimples: boolean;
-  smoothSkinAndShine: boolean;
-  removeDarkCircles: boolean;
-  studioLighting: boolean;
-  whiteningLevel: SkinWhiteningLevel;
-  skinTone: SkinTonePresetKey;
-}
-
-export const DEFAULT_AI_SKIN_BEAUTY_OPTIONS: AiSkinBeautyOptions = {
-  removePimples: true,
-  smoothSkinAndShine: true,
-  removeDarkCircles: true,
-  studioLighting: true,
-  whiteningLevel: "medium",
-  skinTone: "natural",
-};
-
-export interface SkinTonePresetOption {
-  id: SkinTonePresetKey;
-  label: string;
-  description: string;
-  swatch: string;
-}
-
-export const SKIN_TONE_PRESETS: SkinTonePresetOption[] = [
-  { id: "original", label: "Keep Original", description: "Preserve natural skin colour", swatch: "#D8B49B" },
-  { id: "fair", label: "Fair Ivory", description: "Clean luminous fair lift", swatch: "#F6DFCE" },
-  { id: "natural", label: "Natural Even", description: "Balanced passport skin tone", swatch: "#E5BE9E" },
-  { id: "warm", label: "Warm Golden", description: "Soft golden studio warmth", swatch: "#D9A477" },
-  { id: "rosy", label: "Rosy Fresh", description: "Healthy peach-pink glow", swatch: "#EEB7A9" },
-  { id: "olive", label: "Olive Clear", description: "Calms redness evenly", swatch: "#C89D76" },
-  { id: "deep_glow", label: "Deep Radiant", description: "Rich warm bronze glow", swatch: "#8F5E3C" },
-];
-
-export interface AiBeautyQuickPreset {
-  id: string;
-  label: string;
-  description: string;
-  options: AiSkinBeautyOptions;
-}
-
-export const AI_BEAUTY_QUICK_PRESETS: AiBeautyQuickPreset[] = [
-  {
-    id: "natural_passport",
-    label: "Natural Passport",
-    description: "Clean spots, even tone, light brighten",
-    options: {
-      removePimples: true,
-      smoothSkinAndShine: true,
-      removeDarkCircles: true,
-      studioLighting: true,
-      whiteningLevel: "light",
-      skinTone: "natural",
-    },
-  },
-  {
-    id: "fair_bright",
-    label: "Fair & Bright Glow",
-    description: "Strong whitening + clear luminous skin",
-    options: {
-      removePimples: true,
-      smoothSkinAndShine: true,
-      removeDarkCircles: true,
-      studioLighting: true,
-      whiteningLevel: "bright",
-      skinTone: "fair",
-    },
-  },
-  {
-    id: "clear_acne",
-    label: "Pimple & Acne Clear",
-    description: "Maximum spot cleanup, keep natural colour",
-    options: {
-      removePimples: true,
-      smoothSkinAndShine: true,
-      removeDarkCircles: true,
-      studioLighting: false,
-      whiteningLevel: "off",
-      skinTone: "original",
-    },
-  },
-  {
-    id: "studio_rosy",
-    label: "Studio Rosy Portrait",
-    description: "Fresh rosy glow + soft studio key light",
-    options: {
-      removePimples: true,
-      smoothSkinAndShine: true,
-      removeDarkCircles: true,
-      studioLighting: true,
-      whiteningLevel: "medium",
-      skinTone: "rosy",
-    },
-  },
-];
-
-export function hasAnyAiBeautyOption(opts: AiSkinBeautyOptions): boolean {
-  return (
-    opts.removePimples ||
-    opts.smoothSkinAndShine ||
-    opts.removeDarkCircles ||
-    opts.studioLighting ||
-    opts.whiteningLevel !== "off" ||
-    opts.skinTone !== "original"
-  );
-}
 
 export interface PhotoEditState {
   crop: { x: number; y: number };

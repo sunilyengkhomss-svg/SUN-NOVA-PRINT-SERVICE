@@ -13,7 +13,12 @@ import heroPrintImg from "../assets/images/hero_print_studio_1794673000273.jpg";
 import { WebsiteSettings } from "../types/cms";
 import { BRAND_NAME } from "../types/photo";
 
-export type WorkspaceMode = "passport" | "xerox" | "converters" | "resume";
+export type WorkspaceMode =
+  | "passport"
+  | "enhance"
+  | "xerox"
+  | "converters"
+  | "resume";
 
 interface HeroShowcaseProps {
   onJumpToStudio: () => void;
@@ -36,6 +41,7 @@ const WORKSPACE_TABS: Array<{
   icon: typeof ImageIcon;
 }> = [
   { id: "passport", label: "Passport Photo Studio", icon: ImageIcon },
+  { id: "enhance", label: "AI Photo Enhance", icon: Sparkles },
   { id: "xerox", label: "Aadhaar / PAN / ID Xerox", icon: FileText },
   { id: "converters", label: "PDF, XML & Text", icon: ArrowLeftRight },
   { id: "resume", label: "Resume Maker", icon: Briefcase },
@@ -203,11 +209,11 @@ export function HeroShowcase({
             </button>
           </div>
 
-          {/* Centered Studio Workbench Intro + 4-Tab Mode Switcher */}
-          <div className="mt-8 sm:mt-9 max-w-4xl mx-auto">
+          {/* Centered Studio Workbench Intro + 5-Tab Mode Switcher */}
+          <div className="mt-8 sm:mt-9 max-w-5xl mx-auto">
             <div className="text-[11px] sm:text-xs font-mono-nums uppercase tracking-[0.14em] sm:tracking-[0.16em] text-[#00E5FF] leading-relaxed">
               <div>
-                300 PPI INTERACTIVE STUDIO · STUDENT &amp; OFFICER OUTFITS ·
+                300 PPI INTERACTIVE STUDIO · AI PHOTO ENHANCE (HD/4K) ·
               </div>
               <div>AADHAAR | PAN XEROX · RESUME &amp; PDF STUDIO</div>
             </div>
@@ -216,20 +222,19 @@ export function HeroShowcase({
               className="mt-2 text-2xl sm:text-3xl lg:text-[36px] font-extrabold tracking-tight text-[#F5F7FA] leading-tight"
               style={{ textWrap: "balance" }}
             >
-              Passport Photo Maker &amp; Print Xerox Workbench
+              Passport Photo Maker, AI Enhance &amp; Print Workbench
             </h2>
 
             <p className="mt-2.5 text-xs sm:text-sm md:text-[15px] text-[#CBD5E1] max-w-3xl mx-auto leading-relaxed">
-              Crop to 1.2 × 1.5 in or 35 × 45 mm at 300 PPI with Undo/Redo &amp;
-              Image Filters, click live camera photos, print Aadhaar &amp; PAN
-              Xerox sheets, convert PDFs/OCR, or build a Business &amp; Teacher
-              Resume.
+              Crop to 1.2 × 1.5 in or 35 × 45 mm at 300 PPI, upscale &amp; restore
+              photos in AI Photo Enhance Studio, print Aadhaar &amp; PAN Xerox
+              sheets, convert PDFs/OCR, or build a Resume.
             </p>
 
             <div
               role="tablist"
               aria-label="Studio Workspace Modes"
-              className="mt-5 sm:mt-6 grid grid-cols-2 md:grid-cols-4 gap-1.5 p-1.5 bg-[#0D131F]/90 backdrop-blur-xl border border-[#00E5FF]/22 rounded-xl shadow-[0_10px_35px_rgba(0,0,0,0.45)] w-full"
+              className="mt-5 sm:mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5 p-1.5 bg-[#0D131F]/90 backdrop-blur-xl border border-[#00E5FF]/22 rounded-xl shadow-[0_10px_35px_rgba(0,0,0,0.45)] w-full"
             >
               {WORKSPACE_TABS.map((tab) => {
                 const Icon = tab.icon;
