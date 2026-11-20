@@ -215,7 +215,7 @@ async function authenticateAdmin(request: Request, db: D1Database): Promise<Admi
 
 async function storeUploadedFile(opts: {
   file: File;
-  db: D1Database;
+  SUN: D1Database;
   bucket: R2Bucket;
   category: string;
   visibility: MediaVisibility;
