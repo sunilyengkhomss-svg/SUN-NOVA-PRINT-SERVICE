@@ -113,6 +113,7 @@ async function checkRateLimit(
   maxHits: number,
   windowSeconds: number
 ): Promise<boolean> {
+  const db = SUN;
   const nowSec = Math.floor(Date.now() / 1000);
   const existing = await db
     .prepare("SELECT hits, window_start FROM rate_limits WHERE rate_key = ?")
@@ -148,6 +149,7 @@ async function logActivity(
   entityId: string | null,
   details?: string
 ): Promise<void> {
+  const db = SUN;
   await db
     .prepare(
       `INSERT INTO activity_logs (id, admin_id, admin_email, action, entity_type, entity_id, details, created_at)
@@ -215,7 +217,8 @@ async function authenticateAdmin(request: Request, db: D1Database): Promise<Admi
 
 async function storeUploadedFile(opts: {
   file: File;
-  SUN: D1Database;
+  SUN?: D1Database;
+  db?: D1Database;
   bucket: R2Bucket;
   category: string;
   visibility: MediaVisibility;
@@ -224,6 +227,8 @@ async function storeUploadedFile(opts: {
   customName?: string;
   allowAnyUploadOverride?: boolean;
 }): Promise<MediaFileRecord> {
+  const db = opts.SUN || opts.db;
+  if (!db) throw new Error("Database connection required");
   const buf = new Uint8Array(await opts.file.arrayBuffer());
   const detected = detectUploadFileType(buf, opts.file.type, opts.file.name, {
     allowAnyUpload: opts.allowAnyUploadOverride ?? opts.settings.allowAnyUpload,
@@ -298,7 +303,7 @@ async function storeUploadedFile(opts: {
     updated_at: now,
   };
 
-  await opts.db
+  await db
     .prepare(
       `INSERT INTO media_files
        (id, r2_key, filename, original_name, mime_type, file_size, category, visibility, public_url, uploaded_by, created_at, updated_at)

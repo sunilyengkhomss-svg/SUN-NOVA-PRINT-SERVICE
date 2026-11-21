@@ -792,15 +792,16 @@ export function resolveStorageBindings(env: AppWorkerEnv): {
   bucket: R2Bucket;
   storageStatus: StorageStatusInfo;
 } {
-  const d1Bound = Boolean(env.DB);
+  const activeDb = env.SUN || env.DB;
+  const d1Bound = Boolean(activeDb);
   const r2Bound = Boolean(env.MEDIA_BUCKET);
   const geminiConfigured = Boolean(env.GEMINI_API_KEY);
   const setupTokenConfigured = Boolean(env.ADMIN_SETUP_TOKEN);
   const emailProviderConfigured = Boolean(env.RESEND_API_KEY);
 
-  if (env.DB && env.MEDIA_BUCKET) {
+  if (activeDb && env.MEDIA_BUCKET) {
     return {
-      db: env.DB,
+      db: activeDb,
       bucket: env.MEDIA_BUCKET,
       storageStatus: {
         d1Bound: true,
@@ -809,15 +810,15 @@ export function resolveStorageBindings(env: AppWorkerEnv): {
         setupTokenConfigured,
         emailProviderConfigured,
         mode: "d1+r2",
-        summary: "Cloudflare D1 (DB) and R2 (MEDIA_BUCKET) active.",
+        summary: "Cloudflare D1 (SUN/DB) and R2 (MEDIA_BUCKET) active.",
       },
     };
   }
 
-  if (env.DB && !env.MEDIA_BUCKET) {
+  if (activeDb && !env.MEDIA_BUCKET) {
     return {
-      db: env.DB,
-      bucket: new D1BlobR2Bucket(env.DB),
+      db: activeDb,
+      bucket: new D1BlobR2Bucket(activeDb),
       storageStatus: {
         d1Bound: true,
         r2Bound: false,
@@ -826,7 +827,7 @@ export function resolveStorageBindings(env: AppWorkerEnv): {
         emailProviderConfigured,
         mode: "d1+d1blob",
         summary:
-          "Cloudflare D1 (DB) bound; R2 (MEDIA_BUCKET) unbound — storing files in D1 blob fallback (max 1.5 MB/file).",
+          "Cloudflare D1 (SUN/DB) bound; R2 (MEDIA_BUCKET) unbound — storing files in D1 blob fallback (max 1.5 MB/file).",
       },
     };
   }

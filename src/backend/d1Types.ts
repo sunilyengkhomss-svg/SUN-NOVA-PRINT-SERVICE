@@ -50,6 +50,7 @@ export interface R2Bucket {
 
 export interface AppWorkerEnv {
   SUN?: D1Database;
+  DB?: D1Database;
   MEDIA_BUCKET?: R2Bucket;
   GEMINI_API_KEY?: string;
   ADMIN_SETUP_TOKEN?: string;

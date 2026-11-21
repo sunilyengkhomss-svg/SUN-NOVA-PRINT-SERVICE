@@ -416,6 +416,7 @@ async function startServer() {
       });
 
       const apiRes = await handleApiRequest(webReq, {
+        SUN: localDb,
         DB: localDb,
         MEDIA_BUCKET: localBucket,
         GEMINI_API_KEY: process.env.GEMINI_API_KEY,
